@@ -40,6 +40,19 @@ function sixMonthsAgo(d: Date): Date {
   return new Date(d.getFullYear(), d.getMonth() - 5, 1);
 }
 
+// Backend `/v1/reports/cashflow` and `/v1/reports/trends` bucket keys are
+// 'YYYY-MM' (TO_CHAR), so frontend keys + parsing must match that shape —
+// not 'YYYY-MM-DD', and never `new Date('YYYY-MM')` which is UTC-midnight
+// and shifts back a day in negative timezones.
+function yearMonthKey(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+}
+
+function parseYearMonth(ym: string): Date {
+  const [y, m] = ym.split('-').map(Number);
+  return new Date(y, m - 1, 1);
+}
+
 interface CategoryRow {
   name: string;
   currentMinor: number;
@@ -96,8 +109,8 @@ export default function MonthlyReview() {
     return <div className="text-center py-20 text-error">{error}</div>;
   }
 
-  const thisBucket = cashflow?.buckets.find((b) => b.month === startOfMonth(now));
-  const lastBucket = cashflow?.buckets.find((b) => b.month === startOfMonth(prevMonth));
+  const thisBucket = cashflow?.buckets.find((b) => b.month === yearMonthKey(now));
+  const lastBucket = cashflow?.buckets.find((b) => b.month === yearMonthKey(prevMonth));
   const thisExpenseMinor = thisBucket?.expense_minor ?? 0;
   const lastExpenseMinor = lastBucket?.expense_minor ?? 0;
   const delta = thisExpenseMinor - lastExpenseMinor;
@@ -126,7 +139,7 @@ export default function MonthlyReview() {
 
   const trendData = (trends?.buckets ?? []).map((b) => ({
     bucket: b.bucket,
-    label: new Date(b.bucket).toLocaleDateString(undefined, { month: 'short' }),
+    label: parseYearMonth(b.bucket).toLocaleDateString(undefined, { month: 'short' }),
     spendMinor: Math.abs(b.total_minor),
   }));
 

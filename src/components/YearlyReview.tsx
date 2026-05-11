@@ -109,7 +109,12 @@ export default function YearlyReview() {
 
   const trendData = (trends?.buckets ?? []).map((b) => ({
     bucket: b.bucket,
-    label: new Date(b.bucket).toLocaleDateString(undefined, { month: 'short' }),
+    // Parse 'YYYY-MM' as local — `new Date('YYYY-MM')` is UTC-midnight
+    // and silently shifts back a day in negative timezones.
+    label: (() => {
+      const [y, m] = b.bucket.split('-').map(Number);
+      return new Date(y, m - 1, 1).toLocaleDateString(undefined, { month: 'short' });
+    })(),
     spendMinor: Math.abs(b.total_minor),
   }));
 
