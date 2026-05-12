@@ -158,19 +158,11 @@ const CATEGORY_MAP: Record<string, CategoryClassification> = {
   utilities: { category: 'Services', transactionType: 'spending' },
   housing: { category: 'Services', transactionType: 'spending' },
   education: { category: 'Services', transactionType: 'spending' },
-  // Backend's seeded chart-of-accounts has no "Shopping" expense
-  // account — the ingest prompt routes both `retail` AND `other`
-  // category_hint values into the catch-all "Other" account. The
-  // /v1/reports/summary endpoint groups by account name, so without
-  // this mapping every retail receipt (Uniqlo, Costco Wholesale,
-  // lululemon, …) bucketed under "Other" gets dropped from the
-  // Dashboard "where it went" panel AND from the SPENT total.
-  // Pragmatic fix: route Other → Shopping. The merchant aggregation
-  // path is more accurate (it reads merchants.category which IS
-  // 7-class) but the Dashboard summary depends on this until the
-  // backend issue to align chart-of-accounts with the 7 categories
-  // ships.
-  other: { category: 'Shopping', transactionType: 'spending' },
+  // Legacy hint emitted by old extractor prompts; the current backend
+  // routes `other` into Services at write time so this map entry only
+  // matters for very old data that escaped the #68 backfill. Falls
+  // through to "uncategorized" rendering — never silently mis-bucket.
+  other: { category: null, transactionType: 'spending' },
   entertainment: { category: 'Entertainment', transactionType: 'spending' },
   fun: { category: 'Entertainment', transactionType: 'spending' },
   health: { category: 'Health', transactionType: 'spending' },
