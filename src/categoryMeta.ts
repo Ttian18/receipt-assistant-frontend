@@ -24,21 +24,3 @@ export const CATEGORY_META: Record<Category, CategoryMetaEntry> = {
   'Health': { color: '#FF453A', glyph: HeartPulse },
   'Services': { color: '#AF52DE', glyph: Briefcase },
 };
-
-const LEGACY_CATEGORY_MAP: Record<string, Category | null> = {
-  Dining: 'Food & Drinks',
-  Transport: 'Transportation',
-  Shopping: 'Shopping',
-  Travel: 'Travel',
-  Fun: 'Entertainment',
-  Entertainment: 'Entertainment',
-  Utilities: 'Services',
-  Housing: 'Services',
-  'Real Estate': 'Services',
-  Income: null,
-  Investments: null,
-};
-
-export function migrateLegacyCategory(legacy: string): Category | null {
-  return LEGACY_CATEGORY_MAP[legacy] ?? null;
-}
