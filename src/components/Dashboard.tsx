@@ -311,32 +311,31 @@ function RecentList({
       </div>
     );
   }
-  const today = isoDay(new Date());
   return (
     <ul className="rounded-[18px] border border-[var(--color-rule)] bg-[var(--color-surface)] px-5">
       {items.map((tx, idx) => {
         const isProcessing = txIsProcessing(tx.rawStatus);
-        const isToday = tx.date === today;
-        const day = dayOfMonth(tx.date);
+        const dateLabel = formatRelativeDate(tx.date);
+        const isToday = dateLabel === 'Today';
+        const categoryLine = tx.category
+          ? prettyCategory(tx.category)
+          : tx.transactionType !== 'spending'
+            ? prettyCategory(tx.transactionType)
+            : '';
+        const subtitle = tx.paymentMethod?.trim() || categoryLine;
         return (
           <li
             key={tx.id}
             className={cn(
-              'grid grid-cols-[36px_1fr_auto] items-center gap-4 py-3',
+              'grid grid-cols-[44px_1fr_auto] items-center gap-3 py-3',
               idx > 0 && 'border-t border-[var(--color-rule-soft)]',
             )}
           >
-            <span
-              className={cn(
-                'flex h-9 w-9 items-center justify-center rounded-xl',
-                'font-display italic font-medium text-[17px] tnum',
-                isToday
-                  ? 'bg-[var(--color-terracotta)] text-white'
-                  : 'bg-[var(--color-paper-deep)] text-[var(--color-ink)]',
-              )}
-            >
-              {day}
-            </span>
+            <CategoryIcon
+              category={tx.category}
+              transactionType={tx.transactionType}
+              size={44}
+            />
             <button
               type="button"
               onClick={() => !isProcessing && onSelect?.(tx)}
@@ -346,13 +345,19 @@ function RecentList({
                 isProcessing ? 'cursor-default opacity-60' : 'cursor-pointer',
               )}
             >
-              <p className="text-[15px] font-medium truncate">{tx.description}</p>
-              <p className="mt-0.5 text-xs text-[var(--color-ink-muted)] truncate">
-                {tx.category
-                  ? prettyCategory(tx.category)
-                  : tx.transactionType !== 'spending'
-                    ? prettyCategory(tx.transactionType)
-                    : ''}
+              <p className="text-[15px] font-medium leading-snug truncate">{tx.description}</p>
+              {subtitle && (
+                <p className="mt-0.5 text-xs text-[var(--color-ink-muted)] truncate">{subtitle}</p>
+              )}
+              <p
+                className={cn(
+                  'mt-0.5 text-xs tnum truncate',
+                  isToday
+                    ? 'text-[var(--color-terracotta)] font-medium'
+                    : 'text-[var(--color-ink-muted)]',
+                )}
+              >
+                {dateLabel}
               </p>
             </button>
             <span className="font-display italic font-medium text-[17px] tnum">
@@ -382,10 +387,23 @@ function isoDay(d: Date): string {
   return `${y}-${m}-${day}`;
 }
 
-function dayOfMonth(isoDate: string): number {
-  // Parse the day component directly so timezone math doesn't shift it.
-  const parsed = Number(isoDate.slice(8, 10));
-  return Number.isFinite(parsed) ? parsed : 0;
+function formatRelativeDate(isoDate: string): string {
+  // Parse components directly so a "YYYY-MM-DD" string is interpreted in
+  // local time, not UTC (which would shift the day for negative offsets).
+  const y = Number(isoDate.slice(0, 4));
+  const m = Number(isoDate.slice(5, 7));
+  const d = Number(isoDate.slice(8, 10));
+  if (!y || !m || !d) return isoDate;
+  const target = new Date(y, m - 1, d);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const diffDays = Math.round((today.getTime() - target.getTime()) / 86400000);
+  if (diffDays === 0) return 'Today';
+  if (diffDays === 1) return 'Yesterday';
+  if (diffDays > 1 && diffDays < 7) {
+    return target.toLocaleDateString('en-US', { weekday: 'long' });
+  }
+  return `${m}/${d}/${String(y).slice(2)}`;
 }
 
 function weekProgressSentence(now: Date): string {
