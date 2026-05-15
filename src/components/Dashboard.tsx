@@ -322,7 +322,11 @@ function RecentList({
           : tx.transactionType !== 'spending'
             ? prettyCategory(tx.transactionType)
             : '';
-        const subtitle = tx.paymentMethod?.trim() || categoryLine;
+        // Apple-Wallet style: location wins over payment method when
+        // the receipt has a geocoded place. Payment method only shows
+        // for online/no-location entries; category is the last resort.
+        const subtitle =
+          tx.placeCity ?? tx.paymentMethod?.trim() ?? categoryLine;
         return (
           <li
             key={tx.id}

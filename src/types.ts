@@ -33,7 +33,15 @@ export interface Transaction {
   category: Category | null;
   transactionType: TransactionType;
   date: string;
-  paymentMethod: string;
+  /** Null when the receipt's OCR didn't extract a payment method
+   *  (e.g. cash, illegible, missing footer). UI views fall back to
+   *  `placeCity` or category in that case. */
+  paymentMethod: string | null;
+  /** "City, ST" derived from `place.formatted_address` when the
+   *  transaction has a geocoded place (US-only heuristic; non-US
+   *  best-effort). Used as a row-subtitle fallback in Apple-Wallet
+   *  style when `paymentMethod` is unavailable. */
+  placeCity?: string | null;
   amount: number;
   /** Single source of truth for state. UI-visible status labels are derived
    *  via `statusBadge(rawStatus)` from `src/lib/transactionStatus.ts`. */

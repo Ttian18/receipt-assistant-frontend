@@ -261,6 +261,38 @@ export function displayName(
   return fallback ?? 'Unknown';
 }
 
+/**
+ * Parse a "City, ST" subtitle out of a Google `formatted_address`
+ * (e.g. "1757 W Carson St, Torrance, CA 90501, USA" → "Torrance, CA").
+ *
+ * Indexed from the *end* of the comma-split so address lines with
+ * extra components (suites, building names) still find the city /
+ * state-zip pair. US-only — for non-US places, falls back to the
+ * second-to-last component (typically a region/prefecture name),
+ * which is good enough for an Apple-Wallet-style row subtitle.
+ *
+ * Returns null when there's no place, no formatted_address, or the
+ * address is too short to parse — caller decides the next fallback.
+ */
+export function formatPlaceCity(
+  place:
+    | { formatted_address?: string | null; country_code?: string | null }
+    | null
+    | undefined,
+): string | null {
+  const addr = place?.formatted_address?.trim();
+  if (!addr) return null;
+  const parts = addr.split(',').map((s) => s.trim()).filter(Boolean);
+  if (parts.length < 2) return null;
+  if (place?.country_code === 'US' && parts.length >= 4) {
+    const city = parts[parts.length - 3];
+    const stateZip = parts[parts.length - 2];
+    const state = stateZip.split(/\s+/)[0];
+    if (city && state) return `${city}, ${state}`;
+  }
+  return parts[parts.length - 2] || null;
+}
+
 function primaryDocument(t: BackendTransaction): BackendTransaction['documents'][number] | null {
   if (!t.documents || t.documents.length === 0) return null;
   const img = t.documents.find((d) => d.kind === 'receipt_image');
@@ -326,10 +358,11 @@ export function mapTransaction(t: BackendTransaction): Transaction {
   return {
     id: t.id,
     description: displayName(t.place, rv.payee ?? rv.narration ?? null),
+    placeCity: formatPlaceCity(t.place),
     category: classification.category,
     transactionType: classification.transactionType,
     date: rv.occurred_on,
-    paymentMethod: rv.paymentMethod ?? 'Unknown',
+    paymentMethod: rv.paymentMethod ?? null,
     // UI convention: expenses render as negative; income stays positive.
     amount: classification.transactionType === 'income' ? rv.total : -rv.total,
     rawStatus: t.status,
