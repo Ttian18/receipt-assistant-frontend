@@ -5,6 +5,7 @@ import {
   fetchMerchantTransactions,
   fetchPlace,
   patchPlace,
+  pickCjk,
   placeName,
   type MerchantDetailResponse,
   type MerchantTransactionRow,
@@ -66,7 +67,8 @@ export default function MerchantDetail({ brandId, onBack, onSelectReceipt }: Mer
 
   const onEditChineseName = async () => {
     if (!place) return;
-    const current = place.custom_name_zh ?? place.display_name_zh ?? '';
+    const current =
+      place.custom_name_zh ?? pickCjk(place.display_name_zh) ?? '';
     const next = window.prompt(
       'Chinese name for this merchant (clear to remove override):',
       current,
@@ -148,14 +150,16 @@ export default function MerchantDetail({ brandId, onBack, onSelectReceipt }: Mer
             // no Chinese yet, offer an "+ add" affordance so the user
             // can supply one. Either path opens an inline prompt.
             if (!place) return null;
-            const zh = place.custom_name_zh ?? place.display_name_zh ?? null;
+            const zh = place.custom_name_zh ?? pickCjk(place.display_name_zh);
             if (zh && zh === m.canonical_name) return null;
             const source = zh
               ? place.custom_name_zh
                 ? 'you'
                 : place.display_name_zh_source === 'photo_ocr'
                   ? 'storefront'
-                  : 'Google'
+                  : place.display_name_zh_source === 'receipt_ocr'
+                    ? 'receipt'
+                    : 'Google'
               : null;
             return (
               <button

@@ -347,11 +347,6 @@ function RecentList({
             >
               <p className="text-[15px] font-medium leading-snug truncate">
                 {tx.description}
-                {tx.placeChineseName && tx.placeChineseName !== tx.description && (
-                  <span className="ml-1.5 text-[13px] font-normal text-[var(--color-ink-muted)]">
-                    {tx.placeChineseName}
-                  </span>
-                )}
               </p>
               {subtitle && (
                 <p className="mt-0.5 text-xs text-[var(--color-ink-muted)] truncate">{subtitle}</p>

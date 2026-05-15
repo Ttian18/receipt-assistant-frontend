@@ -162,6 +162,105 @@ function merchantFromTxn(t: BackendTransaction): { brand_id: string; canonical_n
   return { brand_id: brandId, canonical_name: canonical ?? brandId };
 }
 
+// Match any CJK Unified Ideograph block, including extensions and
+// the small punctuation/symbols that legitimately appear inside a
+// store name (e.g. "·", "・", "（…）" parentheses around a branch
+// label that the picker still needs to step over).
+const CJK_RUN_RE =
+  /[㐀-䶿一-鿿豈-﫿\u{20000}-\u{2FFFF}]+/gu;
+
+/**
+ * Return the longest contiguous CJK substring in `s`, or null when
+ * `s` has no CJK at all. Used to defend the Chinese-name subtitle
+ * against (a) Google returning mixed strings like
+ * "Wing Hop Fung(永合豐)Monterey Park Store" under a zh locale,
+ * and (b) Latin-only strings stored as display_name_zh because
+ * Google tagged a pure Latin name with locale="zh".
+ */
+export function pickCjk(s: string | null | undefined): string | null {
+  if (!s) return null;
+  const runs = s.match(CJK_RUN_RE);
+  if (!runs || runs.length === 0) return null;
+  return runs.reduce((a, b) => (b.length > a.length ? b : a));
+}
+
+/**
+ * Pick the single best display name for a place, given an ordered
+ * list of languages the user reads. One name only — list views
+ * don't show alternates, this is the *primary* identity for the row.
+ *
+ * Ordered rules:
+ *   1. Custom override (user typed it) — always wins.
+ *   2. For each lang in `userLangs`, in order:
+ *        - if lang === "zh" and the place has a native CJK name,
+ *          return its CJK substring (longest contiguous run).
+ *        - if lang === "en" and the place has an English name,
+ *          return it.
+ *   3. Whatever Chinese name exists, even if marked non-native
+ *      (gloss like 好市多). Better than nothing if zh is in langs.
+ *   4. Google's English string as a last resort.
+ *   5. `fallback` (typically the receipt's payee from OCR).
+ *
+ * Note on `formatted_address`: Google's `formatted_address` is by
+ * design a pure street address, never a business name. It is
+ * deliberately NOT in the cascade — showing "1757 W Carson St" as
+ * the row title misleads the user into thinking that *is* the
+ * merchant name. When no business name resolves, fall back to the
+ * receipt's OCR-extracted payee (which at least came from the
+ * receipt itself), and only then to the literal "Unknown".
+ *
+ * `userLangs` is currently hard-coded to ["zh","en"] at the
+ * call site, but the function takes it as a parameter so a
+ * per-user setting can be wired in without changing this logic.
+ */
+export function displayName(
+  place:
+    | {
+        custom_name_zh?: string | null;
+        display_name_zh?: string | null;
+        display_name_zh_is_native?: boolean | null;
+        display_name_en?: string | null;
+        formatted_address?: string | null;
+      }
+    | null
+    | undefined,
+  fallback: string | null,
+  userLangs: readonly ('zh' | 'en')[] = ['zh', 'en'],
+): string {
+  if (place?.custom_name_zh) return place.custom_name_zh;
+  for (const lang of userLangs) {
+    if (lang === 'zh') {
+      const zh =
+        place?.display_name_zh_is_native === true
+          ? pickCjk(place.display_name_zh)
+          : null;
+      if (zh) return zh;
+    } else if (lang === 'en') {
+      const en = place?.display_name_en;
+      // Skip pure-address fallbacks from Google geocode (e.g.
+      // "1635 S San Gabriel Blvd") — they're not really names.
+      // A "name" must contain at least one letter and NOT start
+      // with a digit-then-space pattern.
+      if (en && !/^\d+\s/.test(en)) return en;
+    }
+  }
+  // No native CJK and no usable English. Try whatever zh we have
+  // even if marked gloss — better than showing an address.
+  if (userLangs.includes('zh')) {
+    const anyZh = pickCjk(place?.display_name_zh);
+    if (anyZh) return anyZh;
+  }
+  // Final fallback: the receipt's own payee string (OCR-extracted
+  // from the receipt itself), then the literal "Unknown".
+  //
+  // Deliberately NOT falling back to `place.display_name_en` again
+  // (it was already given its chance at step 2 with the address-
+  // shape filter) nor to `place.formatted_address` (a pure street
+  // address by design). Reintroducing either here just smuggles
+  // the "1757 W Carson St" output back into a row title.
+  return fallback ?? 'Unknown';
+}
+
 function primaryDocument(t: BackendTransaction): BackendTransaction['documents'][number] | null {
   if (!t.documents || t.documents.length === 0) return null;
   const img = t.documents.find((d) => d.kind === 'receipt_image');
@@ -220,14 +319,13 @@ export function mapTransaction(t: BackendTransaction): Transaction {
   const rv = toReceiptView(t);
   const classification = classifyBackendCategory(rv.category);
   const m = merchantFromTxn(t);
-  // Place's Chinese name follows the same fallback chain as the
-  // MerchantDetail hero: user override wins over Google/photo-OCR.
-  const p = t.place;
-  const placeChineseName =
-    (p?.custom_name_zh ?? p?.display_name_zh) ?? null;
+  // Single-name policy (see receipt-assistant-frontend#?): list
+  // rows show ONE name, picked by displayName(). No subtitle, no
+  // pinyin alongside. The choice cascades user override → native
+  // CJK → English → glossed CJK → address → receipt payee.
   return {
     id: t.id,
-    description: rv.payee ?? rv.narration ?? 'Unknown',
+    description: displayName(t.place, rv.payee ?? rv.narration ?? null),
     category: classification.category,
     transactionType: classification.transactionType,
     date: rv.occurred_on,
@@ -237,7 +335,6 @@ export function mapTransaction(t: BackendTransaction): Transaction {
     rawStatus: t.status,
     documentId: rv.documentId,
     merchantBrandId: m?.brand_id ?? null,
-    placeChineseName,
   };
 }
 
@@ -1036,7 +1133,7 @@ export function placeName(p: PlaceFull | null | undefined): {
   alternate: string | null;
 } | null {
   if (!p) return null;
-  const zh = p.custom_name_zh ?? p.display_name_zh ?? null;
+  const zh = p.custom_name_zh ?? pickCjk(p.display_name_zh);
   const en = p.display_name_en ?? p.formatted_address ?? null;
   if (!zh && !en) return null;
   if (zh && en && zh !== en) return { primary: zh, alternate: en };

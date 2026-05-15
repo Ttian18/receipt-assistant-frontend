@@ -2691,7 +2691,8 @@ export interface components {
             display_name_zh: string | null;
             display_name_zh_locale: string | null;
             /** @enum {string|null} */
-            display_name_zh_source: "google_text" | "photo_ocr" | "user_override" | null;
+            display_name_zh_source: "google_text" | "photo_ocr" | "receipt_ocr" | "user_override" | null;
+            display_name_zh_is_native: boolean | null;
             custom_name_zh: string | null;
             primary_type: string | null;
             primary_type_display_zh: string | null;

@@ -45,11 +45,6 @@ export interface Transaction {
    *  from `metadata.merchant.brand_id` on rows ingested after #64. Drives
    *  navigation from list rows → merchant aggregation page. */
   merchantBrandId?: string | null;
-  /** Place-fallback Chinese name (#74). Resolution order:
-   *    place.custom_name_zh  → place.display_name_zh  → null
-   *  Rendered as a small alias next to the merchant name in list rows
-   *  and on the receipt detail page. */
-  placeChineseName?: string | null;
 }
 
 export interface Metric {

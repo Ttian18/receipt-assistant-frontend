@@ -509,11 +509,6 @@ function LedgerRow({
       >
         <p className="font-display italic font-medium text-[17px] leading-tight tracking-tight truncate">
           {tx.description}
-          {tx.placeChineseName && tx.placeChineseName !== tx.description && (
-            <span className="ml-1.5 font-sans not-italic font-normal text-[13px] text-[var(--color-ink-muted)]">
-              {tx.placeChineseName}
-            </span>
-          )}
         </p>
         <p className="mt-0.5 text-[11px] tracking-[0.04em] uppercase text-[var(--color-ink-muted)] truncate">
           {rowLabelPrefix(tx)}{formatDay(tx.date)}
