@@ -1,8 +1,8 @@
 {
   "service": "receipt-assistant-frontend",
   "version": "0.0.0",
-  "gitSha": "e4376c75c4bdbafd18f528dc737b1e3562a7c03f",
-  "gitShortSha": "e4376c7",
-  "gitBranch": "feat/merchant-aggregation-frontend-33",
-  "builtAt": "2026-05-12T20:46:38.930Z"
+  "gitSha": "2cb72d1146cef091064688be9d2c4c78e4321d32",
+  "gitShortSha": "2cb72d1",
+  "gitBranch": "main",
+  "builtAt": "2026-05-16T09:31:49.516Z"
 }

@@ -12,6 +12,7 @@ import {
   restoreDocument,
   type ReceiptView,
   type BackendTransaction,
+  type BackendTransactionItem,
   type ReExtractDocumentResult,
 } from '../lib/api';
 import { statusBadge } from '../lib/transactionStatus';
@@ -196,7 +197,30 @@ export default function ReceiptDetail({ receiptId, onBack, onSelectMerchant, onA
   const tax = md<number>(legacy, 'tax');
   const tip = md<number>(legacy, 'tip');
   const rawText = md<string>(legacy, 'raw_text');
-  const items = md<Array<{ name: string; quantity?: number; unit_price?: number; total_price?: number }>>(legacy, 'items');
+  // #81: prefer transaction_items table (relational, with item_class /
+  // unit_price_minor / line_total_minor); fall back to legacy
+  // metadata.items JSON for transactions ingested before the lift.
+  const legacyItems = md<Array<{ name: string; quantity?: number; unit_price?: number; total_price?: number }>>(legacy, 'items');
+  const items: BackendTransactionItem[] = receipt.items.length > 0
+    ? receipt.items
+    : (legacyItems ?? []).map((i, idx) => ({
+        line_no: idx + 1,
+        raw_name: i.name,
+        normalized_name: null,
+        quantity: i.quantity ?? 1,
+        unit: null,
+        unit_price_minor: i.unit_price != null ? Math.round(i.unit_price * 100) : null,
+        line_total_minor: i.total_price != null ? Math.round(i.total_price * 100) : 0,
+        currency: receipt.currency,
+        item_class: 'other',
+        confidence: 'low',
+        line_type: 'product',
+        product_id: null,
+        tax_minor: null,
+        tip_share_minor: null,
+        discount_share_minor: null,
+        effective_total_minor: i.total_price != null ? Math.round(i.total_price * 100) : 0,
+      } satisfies BackendTransactionItem));
   const confidence = md<number>(
     (legacy.quality as Metadata | undefined) ?? {},
     'confidence_score',
@@ -265,8 +289,8 @@ export default function ReceiptDetail({ receiptId, onBack, onSelectMerchant, onA
         isProcessing={isProcessing}
       />
 
-      {!isProcessing && items && items.length > 0 && (
-        <LineItemsCard items={items} />
+      {!isProcessing && items.length > 0 && (
+        <LineItemsCard items={items} currency={receipt.currency} />
       )}
 
       {receipt.narration && !isProcessing && (
@@ -772,33 +796,84 @@ function SmallFieldCard({
   );
 }
 
+// Subtle background per item class — keeps the badge informative
+// without screaming. Matches the paper palette.
+const ITEM_CLASS_STYLE: Record<BackendTransactionItem['item_class'], string> = {
+  durable: 'bg-[var(--color-paper-deep)] text-[var(--color-ink)]',
+  consumable: 'bg-amber-50 text-amber-900',
+  food_drink: 'bg-rose-50 text-rose-900',
+  service: 'bg-sky-50 text-sky-900',
+  other: 'bg-stone-100 text-stone-700',
+};
+
+const ITEM_CLASS_LABEL: Record<BackendTransactionItem['item_class'], string> = {
+  durable: 'durable',
+  consumable: 'consumable',
+  food_drink: 'food',
+  service: 'service',
+  other: 'other',
+};
+
+function formatMinor(minor: number | null, currency: string): string {
+  if (minor == null) return '—';
+  const sym = currency === 'USD' ? '$' : '';
+  return `${sym}${(minor / 100).toFixed(2)}`;
+}
+
 function LineItemsCard({
   items,
+  currency,
 }: {
-  items: Array<{ name: string; quantity?: number; unit_price?: number; total_price?: number }>;
+  items: BackendTransactionItem[];
+  currency: string;
 }) {
   return (
     <div className="rounded-[18px] border border-[var(--color-rule)] bg-[var(--color-surface)] overflow-hidden">
-      <div className="px-5 py-4 border-b border-[var(--color-rule)]">
+      <div className="px-5 py-4 border-b border-[var(--color-rule)] flex items-baseline justify-between">
         <h3 className="font-display italic font-medium text-lg leading-none">
           Items <span className="text-[var(--color-ink-muted)]">({items.length})</span>
         </h3>
+        <span className="text-[10px] tracking-[0.16em] uppercase text-[var(--color-ink-muted)]">
+          from transaction_items
+        </span>
       </div>
       <ul className="divide-y divide-[var(--color-rule-soft)]">
-        {items.map((item, i) => (
-          <li
-            key={i}
-            className="grid grid-cols-[1fr_auto_auto] items-baseline gap-4 px-5 py-3"
-          >
-            <span className="text-sm font-medium truncate">{item.name}</span>
-            <span className="text-xs text-[var(--color-ink-muted)] tnum">
-              {item.quantity ?? 1}×
-            </span>
-            <span className="font-display italic font-medium text-base tnum">
-              {item.total_price != null ? `$${item.total_price.toFixed(2)}` : '—'}
-            </span>
-          </li>
-        ))}
+        {items.map((item) => {
+          const name = item.normalized_name?.trim() || item.raw_name;
+          return (
+            <li
+              key={item.line_no}
+              className="grid grid-cols-[1fr_auto] items-start gap-4 px-5 py-3"
+            >
+              <div className="min-w-0">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-medium truncate">{name}</span>
+                  <span
+                    className={cn(
+                      'inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-medium leading-none',
+                      ITEM_CLASS_STYLE[item.item_class],
+                    )}
+                  >
+                    {ITEM_CLASS_LABEL[item.item_class]}
+                  </span>
+                  {item.line_type !== 'product' && (
+                    <span className="text-[10px] text-[var(--color-ink-muted)] uppercase tracking-wider">
+                      {item.line_type}
+                    </span>
+                  )}
+                </div>
+                {item.unit_price_minor != null && item.quantity !== 1 && (
+                  <div className="mt-0.5 text-[11px] text-[var(--color-ink-muted)] tnum">
+                    {item.quantity} × {formatMinor(item.unit_price_minor, item.currency || currency)}
+                  </div>
+                )}
+              </div>
+              <span className="font-display italic font-medium text-base tnum">
+                {formatMinor(item.line_total_minor, item.currency || currency)}
+              </span>
+            </li>
+          );
+        })}
       </ul>
     </div>
   );

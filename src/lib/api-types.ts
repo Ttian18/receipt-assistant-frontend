@@ -1010,6 +1010,734 @@ export interface paths {
         };
         trace?: never;
     };
+    "/v1/items": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List transaction items (admin / aggregation) */
+        get: {
+            parameters: {
+                query?: {
+                    class?: "durable" | "consumable" | "food_drink" | "service" | "other";
+                    from?: string;
+                    to?: string;
+                    transaction_id?: string;
+                    tag?: string;
+                    cursor?: string;
+                    limit?: number;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            items: components["schemas"]["ListedTransactionItem"][];
+                            next_cursor: string | null;
+                        };
+                    };
+                };
+                /** @description Bad request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/products": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List products in the workspace catalog */
+        get: {
+            parameters: {
+                query?: {
+                    class?: "durable" | "consumable" | "food_drink" | "service" | "other";
+                    brand_id?: string;
+                    merchant_id?: string;
+                    q?: string;
+                    include_retired?: boolean | null;
+                    cursor?: string;
+                    limit?: number;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            items: components["schemas"]["Product"][];
+                            next_cursor: string | null;
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/products/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Fetch a single product */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Product"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Patch product user-truth fields */
+        patch: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/merge-patch+json": components["schemas"]["UpdateProductRequest"];
+                    "application/json": components["schemas"]["UpdateProductRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Product"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+            };
+        };
+        trace?: never;
+    };
+    "/v1/products/{id}/merge_into": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Merge this product into the target — re-points transaction_items + owned_items, retires source */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["MergeProductRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["MergeProductResponse"];
+                    };
+                };
+                /** @description Bad request (e.g. self-merge) */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Source or target not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Source already retired */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/products/{id}/recompute": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Recompute aggregate stats from the live transaction_items set */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /**
+                             * Format: uuid
+                             * @example 01HXY9F0ABCDEFGHJKMNPQRSTV
+                             */
+                            id: string;
+                            purchase_count: number;
+                            total_spent_minor: number;
+                            first_purchased_on: string | null;
+                            last_purchased_on: string | null;
+                        };
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/owned-items": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List owned physical-instance items */
+        get: {
+            parameters: {
+                query?: {
+                    product_id?: string;
+                    location?: string;
+                    include_retired?: boolean | null;
+                    cursor?: string;
+                    limit?: number;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            items: components["schemas"]["OwnedItem"][];
+                            next_cursor: string | null;
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        /** Manually add an owned item (gift / secondhand / inherited) */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["CreateOwnedItemRequest"];
+                };
+            };
+            responses: {
+                /** @description Created */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["OwnedItem"];
+                    };
+                };
+                /** @description Validation failed */
+                422: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/owned-items/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Fetch one owned item */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["OwnedItem"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        /** Hard-delete an owned item (typically used by undo of manual create) */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Deleted */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        /** Patch serial / location / warranty / condition / notes */
+        patch: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/merge-patch+json": components["schemas"]["UpdateOwnedItemRequest"];
+                    "application/json": components["schemas"]["UpdateOwnedItemRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["OwnedItem"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+            };
+        };
+        trace?: never;
+    };
+    "/v1/brands": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List brands (global registry) */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            items: components["schemas"]["Brand"][];
+                            next_cursor: string | null;
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/brands/{brandId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Fetch one brand */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    brandId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Brand"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Update a brand — name / domain / Layer-3 preferred_asset_id override */
+        patch: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    brandId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/merge-patch+json": components["schemas"]["UpdateBrandRequest"];
+                    "application/json": components["schemas"]["UpdateBrandRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Brand"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+            };
+        };
+        trace?: never;
+    };
+    "/v1/brands/{brandId}/assets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List candidate icons for a brand */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    brandId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            items: components["schemas"]["BrandAsset"][];
+                            next_cursor: string | null;
+                        };
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/brands/{brandId}/icon": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Resolve the preferred icon and stream it (501 until #101 Phase 2) */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    brandId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Icon bytes */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Brand or preferred asset missing */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Streaming not implemented yet */
+                501: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/postings": {
         parameters: {
             query?: never;
@@ -3093,6 +3821,40 @@ export interface components {
                 ocr_extracted?: unknown;
             }[] | null;
         } | null;
+        TransactionItem: {
+            line_no: number;
+            raw_name: string;
+            normalized_name: string | null;
+            quantity: number | null;
+            unit: string | null;
+            unit_price_minor: number | null;
+            line_total_minor: number;
+            currency: string;
+            /** @enum {string} */
+            item_class: "durable" | "consumable" | "food_drink" | "service" | "other";
+            /** @enum {string|null} */
+            durability_tier?: "luxury" | "standard" | null;
+            /** @enum {string|null} */
+            food_kind?: "restaurant_dish" | "grocery_food" | "beverage" | null;
+            tags?: string[] | null;
+            /** @enum {string} */
+            confidence: "high" | "medium" | "low";
+            /** @default product */
+            line_type: string;
+            /**
+             * Format: uuid
+             * @default null
+             * @example 01HXY9F0ABCDEFGHJKMNPQRSTV
+             */
+            product_id: string | null;
+            /** @default null */
+            tax_minor: number | null;
+            /** @default null */
+            tip_share_minor: number | null;
+            /** @default null */
+            discount_share_minor: number | null;
+            effective_total_minor: number;
+        };
         Transaction: {
             /**
              * Format: uuid
@@ -3145,6 +3907,7 @@ export interface components {
             postings: components["schemas"]["Posting"][];
             documents: components["schemas"]["TransactionDocumentRef"][];
             place: components["schemas"]["Place"];
+            items: components["schemas"]["TransactionItem"][];
         };
         BulkResultItem: {
             index: number;
@@ -3153,6 +3916,278 @@ export interface components {
         };
         BulkResponse: {
             results: components["schemas"]["BulkResultItem"][];
+        };
+        ListedTransactionItem: components["schemas"]["TransactionItem"] & {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            transaction_id: string;
+            created_at: string;
+        };
+        Product: {
+            /**
+             * Format: uuid
+             * @example 01HXY9F0ABCDEFGHJKMNPQRSTV
+             */
+            id: string;
+            /**
+             * Format: uuid
+             * @example 01HXY9F0ABCDEFGHJKMNPQRSTV
+             */
+            workspace_id: string;
+            product_key: string;
+            canonical_name: string;
+            /**
+             * Format: uuid
+             * @example 01HXY9F0ABCDEFGHJKMNPQRSTV
+             */
+            merchant_id: string | null;
+            brand_id: string | null;
+            /** @enum {string} */
+            item_class: "durable" | "consumable" | "food_drink" | "service" | "other";
+            model: string | null;
+            color: string | null;
+            size: string | null;
+            variant: string | null;
+            sku: string | null;
+            manufacturer: string | null;
+            /**
+             * Format: date
+             * @example 2026-04-19
+             */
+            first_purchased_on: string | null;
+            /**
+             * Format: date
+             * @example 2026-04-19
+             */
+            last_purchased_on: string | null;
+            purchase_count: number;
+            total_spent_minor: number;
+            custom_name: string | null;
+            notes: string | null;
+            /** Format: date-time */
+            retired_from_catalog_at: string | null;
+            /**
+             * @description User-defined JSON object; not schema-validated.
+             * @default {}
+             */
+            metadata: {
+                [key: string]: unknown;
+            };
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            updated_at: string;
+        };
+        UpdateProductRequest: {
+            custom_name?: string | null;
+            notes?: string | null;
+            brand_id?: string | null;
+            /**
+             * Format: uuid
+             * @example 01HXY9F0ABCDEFGHJKMNPQRSTV
+             */
+            merchant_id?: string | null;
+            /** Format: date-time */
+            retired_from_catalog_at?: string | null;
+        };
+        MergeProductRequest: {
+            /**
+             * Format: uuid
+             * @example 01HXY9F0ABCDEFGHJKMNPQRSTV
+             */
+            target_id: string;
+        };
+        MergeProductResponse: {
+            /**
+             * Format: uuid
+             * @example 01HXY9F0ABCDEFGHJKMNPQRSTV
+             */
+            source_id: string;
+            /**
+             * Format: uuid
+             * @example 01HXY9F0ABCDEFGHJKMNPQRSTV
+             */
+            target_id: string;
+            moved_transaction_items: number;
+            moved_owned_items: number;
+            /**
+             * Format: uuid
+             * @example 01HXY9F0ABCDEFGHJKMNPQRSTV
+             */
+            derivation_event_id: string;
+        };
+        OwnedItem: {
+            /**
+             * Format: uuid
+             * @example 01HXY9F0ABCDEFGHJKMNPQRSTV
+             */
+            id: string;
+            /**
+             * Format: uuid
+             * @example 01HXY9F0ABCDEFGHJKMNPQRSTV
+             */
+            workspace_id: string;
+            /**
+             * Format: uuid
+             * @example 01HXY9F0ABCDEFGHJKMNPQRSTV
+             */
+            product_id: string;
+            /**
+             * Format: uuid
+             * @example 01HXY9F0ABCDEFGHJKMNPQRSTV
+             */
+            transaction_item_id: string | null;
+            instance_index: number;
+            serial_number: string | null;
+            location: string | null;
+            /**
+             * Format: date
+             * @example 2026-04-19
+             */
+            acquired_on: string | null;
+            /**
+             * Format: date
+             * @example 2026-04-19
+             */
+            warranty_until: string | null;
+            condition: string | null;
+            /** Format: date-time */
+            retired_at: string | null;
+            notes: string | null;
+            /**
+             * @description User-defined JSON object; not schema-validated.
+             * @default {}
+             */
+            metadata: {
+                [key: string]: unknown;
+            };
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            updated_at: string;
+        };
+        CreateOwnedItemRequest: {
+            /**
+             * Format: uuid
+             * @example 01HXY9F0ABCDEFGHJKMNPQRSTV
+             */
+            product_id: string;
+            /**
+             * Format: uuid
+             * @example 01HXY9F0ABCDEFGHJKMNPQRSTV
+             */
+            transaction_item_id?: string;
+            instance_index?: number;
+            serial_number?: string;
+            location?: string;
+            /**
+             * Format: date
+             * @example 2026-04-19
+             */
+            acquired_on?: string;
+            /**
+             * Format: date
+             * @example 2026-04-19
+             */
+            warranty_until?: string;
+            condition?: string;
+            notes?: string;
+            /**
+             * @description User-defined JSON object; not schema-validated.
+             * @default {}
+             */
+            metadata: {
+                [key: string]: unknown;
+            };
+        };
+        UpdateOwnedItemRequest: {
+            serial_number?: string | null;
+            location?: string | null;
+            /**
+             * Format: date
+             * @example 2026-04-19
+             */
+            acquired_on?: string | null;
+            /**
+             * Format: date
+             * @example 2026-04-19
+             */
+            warranty_until?: string | null;
+            condition?: string | null;
+            notes?: string | null;
+            /** Format: date-time */
+            retired_at?: string | null;
+            /**
+             * @description User-defined JSON object; not schema-validated.
+             * @default {}
+             */
+            metadata: {
+                [key: string]: unknown;
+            };
+        };
+        Brand: {
+            brand_id: string;
+            parent_id: string | null;
+            name: string;
+            domain: string | null;
+            /**
+             * Format: uuid
+             * @example 01HXY9F0ABCDEFGHJKMNPQRSTV
+             */
+            preferred_asset_id: string | null;
+            icon_url: string | null;
+            /** Format: date-time */
+            user_chose_at: string | null;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            updated_at: string;
+        };
+        BrandAsset: {
+            /**
+             * Format: uuid
+             * @example 01HXY9F0ABCDEFGHJKMNPQRSTV
+             */
+            id: string;
+            brand_id: string;
+            /** @enum {string} */
+            tier: "itunes" | "svgl" | "logo_dev" | "simple_icons" | "user_upload" | "manual_url";
+            source_url: string | null;
+            local_path: string;
+            content_hash: string;
+            content_type: string;
+            width: number | null;
+            height: number | null;
+            bytes: number | null;
+            /** Format: date-time */
+            acquired_at: string;
+            /** Format: date-time */
+            last_seen_at: string;
+            agent_relevance: number | null;
+            agent_notes: string | null;
+            extraction_version: number;
+            user_rating: number | null;
+            user_uploaded: boolean;
+            user_notes: string | null;
+            /** Format: date-time */
+            retired_at: string | null;
+            /**
+             * @description User-defined JSON object; not schema-validated.
+             * @default {}
+             */
+            metadata: {
+                [key: string]: unknown;
+            };
+        };
+        UpdateBrandRequest: {
+            /**
+             * Format: uuid
+             * @example 01HXY9F0ABCDEFGHJKMNPQRSTV
+             */
+            preferred_asset_id?: string | null;
+            name?: string;
+            domain?: string | null;
         };
         Document: {
             /**

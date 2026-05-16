@@ -42,6 +42,11 @@ export type BackendTransaction = components['schemas']['Transaction'];
 export type BackendPosting = components['schemas']['Posting'];
 export type BackendPlace = components['schemas']['Place'];
 export type BackendDocument = components['schemas']['Document'];
+export type BackendTransactionItem = components['schemas']['TransactionItem'];
+export type BackendProduct = components['schemas']['Product'];
+export type BackendOwnedItem = components['schemas']['OwnedItem'];
+export type BackendBrand = components['schemas']['Brand'];
+export type BackendBrandAsset = components['schemas']['BrandAsset'];
 export type BackendBatch = components['schemas']['Batch'];
 export type BackendBatchSummary = components['schemas']['BatchSummary'];
 export type BackendIngest = components['schemas']['Ingest'];
@@ -104,6 +109,9 @@ export interface ReceiptView {
   /** Canonical merchant brand id (from metadata.merchant.brand_id),
    *  used to link to the merchant aggregation page. */
   merchantBrandId: string | null;
+  /** Line items lifted from transaction_items (#81). Empty array
+   *  for transactions without extracted lines. */
+  items: BackendTransactionItem[];
   etag: string | null;
 }
 
@@ -348,6 +356,7 @@ export function toReceiptView(t: BackendTransaction, etag: string | null = null)
     postings: t.postings,
     place: t.place ?? null,
     merchantBrandId: merchantFromTxn(t)?.brand_id ?? null,
+    items: t.items ?? [],
     etag,
   };
 }
@@ -1249,4 +1258,117 @@ export function placeName(p: PlaceFull | null | undefined): {
   if (!zh && !en) return null;
   if (zh && en && zh !== en) return { primary: zh, alternate: en };
   return { primary: zh ?? en ?? '', alternate: null };
+}
+
+// ── Products / OwnedItems / Brands (#84, #101) ──────────────────
+//
+// Vertical-slice frontend for three backend features shipped 2026-05-16:
+//   - #81 transaction_items (consumed via Transaction.items above)
+//   - #84 products SSOT + owned_items physical-inventory
+//   - #101 brands + brand_assets
+//
+// Helpers below are intentionally thin pass-throughs to openapi-fetch;
+// no business logic in the client. UI lives in src/components/.
+
+export interface ListProductsOptions {
+  class?: 'durable' | 'consumable' | 'food_drink' | 'service' | 'other';
+  brand_id?: string;
+  merchant_id?: string;
+  search?: string;
+  limit?: number;
+}
+
+export async function listProducts(opts: ListProductsOptions = {}): Promise<BackendProduct[]> {
+  const { data, error, response } = await client.GET('/v1/products', {
+    params: { query: opts },
+  });
+  return unwrap('listProducts', data, error, response.status).items;
+}
+
+export async function getProduct(id: string): Promise<BackendProduct> {
+  const { data, error, response } = await client.GET('/v1/products/{id}', {
+    params: { path: { id } },
+  });
+  return unwrap('getProduct', data, error, response.status);
+}
+
+export async function patchProduct(
+  id: string,
+  patch: components['schemas']['UpdateProductRequest'],
+): Promise<BackendProduct> {
+  const { data, error, response } = await client.PATCH('/v1/products/{id}', {
+    params: { path: { id } },
+    body: patch,
+  });
+  return unwrap('patchProduct', data, error, response.status);
+}
+
+export type MergeProductResult = components['schemas']['MergeProductResponse'];
+
+export async function mergeProductInto(
+  sourceId: string,
+  targetId: string,
+): Promise<MergeProductResult> {
+  const { data, error, response } = await client.POST('/v1/products/{id}/merge_into', {
+    params: { path: { id: sourceId } },
+    body: { target_id: targetId },
+  });
+  return unwrap('mergeProductInto', data, error, response.status);
+}
+
+export interface RecomputeProductResult {
+  id: string;
+  purchase_count: number;
+  total_spent_minor: number;
+  first_purchased_on: string | null;
+  last_purchased_on: string | null;
+}
+
+export async function recomputeProduct(id: string): Promise<RecomputeProductResult> {
+  const { data, error, response } = await client.POST('/v1/products/{id}/recompute', {
+    params: { path: { id } },
+  });
+  return unwrap('recomputeProduct', data, error, response.status);
+}
+
+export async function listOwnedItems(opts: {
+  product_id?: string;
+  location?: string;
+  include_retired?: boolean;
+  limit?: number;
+} = {}): Promise<BackendOwnedItem[]> {
+  const { data, error, response } = await client.GET('/v1/owned-items', {
+    params: { query: opts },
+  });
+  return unwrap('listOwnedItems', data, error, response.status).items;
+}
+
+export async function listBrands(): Promise<BackendBrand[]> {
+  const { data, error, response } = await client.GET('/v1/brands', {});
+  return unwrap('listBrands', data, error, response.status).items;
+}
+
+export async function getBrand(brandId: string): Promise<BackendBrand> {
+  const { data, error, response } = await client.GET('/v1/brands/{brandId}', {
+    params: { path: { brandId } },
+  });
+  return unwrap('getBrand', data, error, response.status);
+}
+
+export async function listBrandAssets(brandId: string): Promise<BackendBrandAsset[]> {
+  const { data, error, response } = await client.GET('/v1/brands/{brandId}/assets', {
+    params: { path: { brandId } },
+  });
+  return unwrap('listBrandAssets', data, error, response.status).items;
+}
+
+export async function patchBrand(
+  brandId: string,
+  patch: { name?: string; domain?: string | null; preferred_asset_id?: string | null },
+): Promise<BackendBrand> {
+  const { data, error, response } = await client.PATCH('/v1/brands/{brandId}', {
+    params: { path: { brandId } },
+    body: patch,
+  });
+  return unwrap('patchBrand', data, error, response.status);
 }

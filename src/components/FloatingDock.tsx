@@ -1,12 +1,14 @@
 import React from 'react';
+import { Settings as SettingsIcon } from 'lucide-react';
 import { cn } from '../lib/utils';
 
-export type DockDestination = 'books' | 'add' | 'review';
+export type DockDestination = 'books' | 'add' | 'review' | 'settings';
 
 interface FloatingDockProps {
   active: DockDestination;
   onNavigate: (dest: 'books' | 'review') => void;
   onAdd: () => void;
+  onSettings: () => void;
 }
 
 /**
@@ -18,7 +20,7 @@ interface FloatingDockProps {
  *   Add     ← navigates to the full-screen Capture route
  *   Review  ← monthly / yearly
  */
-export default function FloatingDock({ active, onNavigate, onAdd }: FloatingDockProps) {
+export default function FloatingDock({ active, onNavigate, onAdd, onSettings }: FloatingDockProps) {
   return (
     <nav
       aria-label="Primary"
@@ -47,6 +49,20 @@ export default function FloatingDock({ active, onNavigate, onAdd }: FloatingDock
         isActive={active === 'review'}
         onClick={() => onNavigate('review')}
       />
+      <button
+        type="button"
+        onClick={onSettings}
+        aria-current={active === 'settings' ? 'page' : undefined}
+        aria-label="Settings"
+        className={cn(
+          'flex items-center justify-center w-9 h-9 rounded-full transition-colors duration-200 ease-out',
+          active === 'settings'
+            ? 'bg-[var(--color-terracotta)] text-white'
+            : 'text-[color:rgba(250,246,236,0.7)] hover:text-[color:rgba(250,246,236,1)]',
+        )}
+      >
+        <SettingsIcon size={16} aria-hidden="true" />
+      </button>
     </nav>
   );
 }

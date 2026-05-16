@@ -6,6 +6,7 @@ interface LayoutProps {
   dockActive: DockDestination;
   onDockNavigate: (dest: 'books' | 'review') => void;
   onAddTransaction: () => void;
+  onSettings: () => void;
   /** When true the floating dock is omitted — full-bleed surfaces like
    *  the Capture route own the whole viewport. */
   dockHidden?: boolean;
@@ -24,6 +25,7 @@ export default function Layout({
   dockActive,
   onDockNavigate,
   onAddTransaction,
+  onSettings,
   dockHidden = false,
 }: LayoutProps) {
   return (
@@ -46,6 +48,7 @@ export default function Layout({
           active={dockActive}
           onNavigate={onDockNavigate}
           onAdd={onAddTransaction}
+          onSettings={onSettings}
         />
       )}
     </div>
