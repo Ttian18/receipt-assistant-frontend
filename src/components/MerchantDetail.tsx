@@ -104,18 +104,22 @@ export default function MerchantDetail({ brandId, onBack, onSelectReceipt }: Mer
     }
   };
 
-  const onEditChineseName = async () => {
+  // The legacy hero "pencil" affordance. Originally Chinese-only;
+  // post-#79 the column is language-agnostic, so any string is fine.
+  // A dedicated inline-rename modal from transaction rows lands in
+  // a follow-up PR (#79 MVP A).
+  const onEditName = async () => {
     if (!place) return;
     const current =
-      place.custom_name_zh ?? pickCjk(place.display_name_zh) ?? '';
+      place.custom_name ?? place.custom_name_zh ?? pickCjk(place.display_name_zh) ?? '';
     const next = window.prompt(
-      'Chinese name for this merchant (clear to remove override):',
+      'Your name for this merchant (clear to remove override):',
       current,
     );
     if (next === null) return; // user cancelled
     try {
       const updated = await patchPlace(place.id, {
-        custom_name_zh: next.trim() === '' ? null : next.trim(),
+        custom_name: next.trim() === '' ? null : next.trim(),
       });
       setPlace(updated);
     } catch (e) {
@@ -189,10 +193,14 @@ export default function MerchantDetail({ brandId, onBack, onSelectReceipt }: Mer
             // no Chinese yet, offer an "+ add" affordance so the user
             // can supply one. Either path opens an inline prompt.
             if (!place) return null;
-            const zh = place.custom_name_zh ?? pickCjk(place.display_name_zh);
+            // `custom_name` (post-#79 rename) wins, fall back to the
+            // deprecated `custom_name_zh` alias during the transition
+            // window, then to the derived `display_name_zh`.
+            const override = place.custom_name ?? place.custom_name_zh ?? null;
+            const zh = override ?? pickCjk(place.display_name_zh);
             if (zh && zh === m.canonical_name) return null;
             const source = zh
-              ? place.custom_name_zh
+              ? override
                 ? 'you'
                 : place.display_name_zh_source === 'photo_ocr'
                   ? 'storefront'
@@ -203,9 +211,9 @@ export default function MerchantDetail({ brandId, onBack, onSelectReceipt }: Mer
             return (
               <button
                 type="button"
-                onClick={onEditChineseName}
+                onClick={onEditName}
                 className="mt-1 inline-flex items-center gap-2 group"
-                title={zh ? `Source: ${source}. Click to edit.` : 'Add Chinese name'}
+                title={zh ? `Source: ${source}. Click to edit.` : 'Add a name override'}
               >
                 {zh ? (
                   <>
@@ -218,7 +226,7 @@ export default function MerchantDetail({ brandId, onBack, onSelectReceipt }: Mer
                   </>
                 ) : (
                   <span className="text-[11px] uppercase tracking-[0.15em] text-white/55 group-hover:text-white/85">
-                    + add Chinese name
+                    + add custom name
                   </span>
                 )}
               </button>

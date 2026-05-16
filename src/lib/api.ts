@@ -216,6 +216,9 @@ export function pickCjk(s: string | null | undefined): string | null {
 export function displayName(
   place:
     | {
+        custom_name?: string | null;
+        /** @deprecated Use `custom_name`. Read as a fallback for one
+         *  release while the backend dual-emits both keys. */
         custom_name_zh?: string | null;
         display_name_zh?: string | null;
         display_name_zh_is_native?: boolean | null;
@@ -227,6 +230,9 @@ export function displayName(
   fallback: string | null,
   userLangs: readonly ('zh' | 'en')[] = ['zh', 'en'],
 ): string {
+  if (place?.custom_name) return place.custom_name;
+  // Backward-compat fallback while the deprecated alias is still
+  // emitted by the backend (#79 transition window).
   if (place?.custom_name_zh) return place.custom_name_zh;
   for (const lang of userLangs) {
     if (lang === 'zh') {
@@ -1138,10 +1144,15 @@ export async function fetchPlace(id: string): Promise<PlaceFull> {
   return unwrap('fetchPlace', data, error, response.status);
 }
 
-/** Update the user-overridable `custom_name_zh`. Pass `null` to clear. */
+/**
+ * Update the user-overridable `custom_name` on a place. Pass `null`
+ * to clear. The field was renamed from `custom_name_zh` in #79 —
+ * the backend still accepts the old key as a deprecated alias for
+ * one release, but new callers should use `custom_name`.
+ */
 export async function patchPlace(
   id: string,
-  patch: { custom_name_zh?: string | null },
+  patch: { custom_name?: string | null },
 ): Promise<PlaceFull> {
   const { data, error, response } = await client.PATCH('/v1/places/{id}', {
     params: { path: { id } },
@@ -1165,7 +1176,8 @@ export type RefreshPlaceResult = components['schemas']['RefreshPlaceResponse'];
  *  - 502 — upstream Google error (status passed through in `upstream_status`)
  *
  * Layer-3 protections inherited from the backend:
- *  - `custom_name_zh` and OCR-sourced zh fields survive
+ *  - `custom_name` (renamed from `custom_name_zh` in #79) and
+ *    OCR-sourced zh fields survive
  *  - `derivation_events` row written even on no-op refresh
  */
 export async function postRefreshPlace(id: string): Promise<RefreshPlaceResult> {
@@ -1205,9 +1217,12 @@ export async function postReExtractDocument(
 
 /**
  * Fallback chain for rendering a place's name in the UI:
- *   custom_name_zh  → user override (always wins)
- *   display_name_zh → Google v1 zh-CN call or photo-OCR fallback
- *   display_name_en → English fallback (never disappears)
+ *   custom_name      → user override (always wins; renamed from
+ *                      `custom_name_zh` in #79 — backward-compat
+ *                      handled by `displayName()` and the backend's
+ *                      one-release dual emit)
+ *   display_name_zh  → Google v1 zh-CN call or photo-OCR fallback
+ *   display_name_en  → English fallback (never disappears)
  *
  * Receipts arrive in English transliteration (`Wing On Market`), but
  * the user may know the merchant as the Chinese name (`永安`). The
@@ -1219,7 +1234,10 @@ export function placeName(p: PlaceFull | null | undefined): {
   alternate: string | null;
 } | null {
   if (!p) return null;
-  const zh = p.custom_name_zh ?? pickCjk(p.display_name_zh);
+  // Prefer the new `custom_name`; the deprecated `custom_name_zh`
+  // alias is still emitted by the backend for one release window.
+  const override = p.custom_name ?? p.custom_name_zh ?? null;
+  const zh = override ?? pickCjk(p.display_name_zh);
   const en = p.display_name_en ?? p.formatted_address ?? null;
   if (!zh && !en) return null;
   if (zh && en && zh !== en) return { primary: zh, alternate: en };

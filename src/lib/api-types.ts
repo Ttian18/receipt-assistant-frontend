@@ -2366,7 +2366,7 @@ export interface paths {
         head?: never;
         /**
          * Update user-overridable place fields.
-         * @description Currently exposes only `custom_name_zh` — the user override that wins over `display_name_zh` in the UI fallback chain. Pass null to clear.
+         * @description Currently exposes only `custom_name` — the user override that wins over `display_name_zh` in the UI fallback chain. Pass null to clear.
          */
         patch: {
             parameters: {
@@ -2416,7 +2416,7 @@ export interface paths {
         put?: never;
         /**
          * Re-run Layer 2 projection over cached raw_response.
-         * @description Re-applies the current projection logic to the cached Google Places response, overwriting derived columns. Layer 3 user-truth (`custom_name_zh`) is never touched. OCR-sourced zh fields (`display_name_zh_source IN ('photo_ocr','receipt_ocr')`) are preserved verbatim. Every run inserts a `derivation_events` row with a `before`/`after` jsonb diff; the returned `derivation_event_id` lets you correlate. Returns 422 when `raw_response` is NULL.
+         * @description Re-applies the current projection logic to the cached Google Places response, overwriting derived columns. Layer 3 user-truth (`custom_name`) is never touched. OCR-sourced zh fields (`display_name_zh_source IN ('photo_ocr','receipt_ocr')`) are preserved verbatim. Every run inserts a `derivation_events` row with a `before`/`after` jsonb diff; the returned `derivation_event_id` lets you correlate. Returns 422 when `raw_response` is NULL.
          */
         post: {
             parameters: {
@@ -2475,7 +2475,7 @@ export interface paths {
         put?: never;
         /**
          * Re-fetch Google v1 + re-derive Layer 2 in one step.
-         * @description Calls Google Places v1 (dual-language, FieldMask=*), appends a `place_snapshots` row, overwrites `places.raw_response`, then delegates to `/v1/places/{id}/re-derive` so Layer 2 columns reflect the new body. Layer 3 (`custom_name_zh`) and OCR-sourced zh fields are shielded by the re-derive step. Yelp re-fetch is deferred until a Yelp client lands (separate epic). Returns 503 when `GOOGLE_MAPS_API_KEY` is unset and 502 on upstream errors.
+         * @description Calls Google Places v1 (dual-language, FieldMask=*), appends a `place_snapshots` row, overwrites `places.raw_response`, then delegates to `/v1/places/{id}/re-derive` so Layer 2 columns reflect the new body. Layer 3 (`custom_name`) and OCR-sourced zh fields are shielded by the re-derive step. Yelp re-fetch is deferred until a Yelp client lands (separate epic). Returns 503 when `GOOGLE_MAPS_API_KEY` is unset and 502 on upstream errors.
          */
         post: {
             parameters: {
@@ -2929,6 +2929,7 @@ export interface components {
             /** @enum {string|null} */
             display_name_zh_source: "google_text" | "photo_ocr" | "receipt_ocr" | "user_override" | null;
             display_name_zh_is_native: boolean | null;
+            custom_name: string | null;
             custom_name_zh: string | null;
             primary_type: string | null;
             primary_type_display_zh: string | null;
@@ -3663,6 +3664,7 @@ export interface components {
             session_id: string;
         };
         UpdatePlaceRequest: {
+            custom_name?: string | null;
             custom_name_zh?: string | null;
         };
         ReDerivePlaceResponse: {
