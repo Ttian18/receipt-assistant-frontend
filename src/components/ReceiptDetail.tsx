@@ -289,6 +289,10 @@ export default function ReceiptDetail({ receiptId, onBack, onSelectMerchant, onA
         isProcessing={isProcessing}
       />
 
+      {!isProcessing && (
+        <LocationCard place={receipt.place} placeId={receipt.place?.id ?? null} />
+      )}
+
       {!isProcessing && items.length > 0 && (
         <LineItemsCard items={items} currency={receipt.currency} />
       )}
@@ -713,6 +717,88 @@ function NoteCard({ text }: { text: string }) {
         your note
       </span>
       <p className="font-hand text-lg text-[var(--color-ink)]">{text}</p>
+    </div>
+  );
+}
+
+// FE#15: a persistent Location card so users can tell the difference
+// between "no location data for this receipt" (e.g. geocoding skipped
+// or denied at extract time) and "the section is broken / missing".
+// Before this fix, the only diagnostic was buried in backend container
+// logs ("Geocoding denied — skip geocoding") and the user saw nothing.
+function LocationCard({
+  place,
+  placeId,
+}: {
+  place: ReceiptView['place'];
+  placeId: string | null;
+}) {
+  // Compose what we have. `formatted_address` from Google is the
+  // typical human-friendly line ("1635 S San Gabriel Blvd, …").
+  const addr = place?.formatted_address?.trim() || null;
+  const cityState = (() => {
+    if (!addr) return null;
+    const parts = addr.split(',').map((s) => s.trim()).filter(Boolean);
+    if (parts.length < 2) return null;
+    // US format trims trailing ", USA"; non-US use second-to-last.
+    if (place?.country_code === 'US' && parts.length >= 4) {
+      const city = parts[parts.length - 3];
+      const stateZip = parts[parts.length - 2];
+      const st = stateZip?.split(/\s+/)[0];
+      return st ? `${city}, ${st}` : city ?? null;
+    }
+    return parts[parts.length - 2] ?? null;
+  })();
+  const mapUrl =
+    placeId && place && place.lat != null && place.lng != null
+      ? `/api/v1/places/${placeId}/map`
+      : null;
+
+  return (
+    <div className="rounded-[14px] border border-[var(--color-rule)] bg-[var(--color-surface)] px-4 py-3">
+      <p className="text-[11px] font-medium tracking-[0.14em] uppercase text-[var(--color-ink-muted)]">
+        Location
+      </p>
+      {place ? (
+        <div className="mt-2 flex items-start gap-3">
+          {mapUrl ? (
+            <img
+              src={mapUrl}
+              alt="Static map of merchant location"
+              loading="lazy"
+              decoding="async"
+              width={72}
+              height={72}
+              className="h-[72px] w-[72px] rounded-[10px] object-cover bg-[var(--color-paper-deep)]/40 shrink-0"
+            />
+          ) : null}
+          <div className="min-w-0 flex-1">
+            {cityState && (
+              <p className="text-[15px] font-medium">{cityState}</p>
+            )}
+            {addr && (
+              <p
+                className={cn(
+                  'text-[13px] text-[var(--color-ink-muted)]',
+                  cityState ? 'mt-0.5' : 'mt-1',
+                )}
+              >
+                {addr}
+              </p>
+            )}
+            {!cityState && !addr && (
+              <p className="text-[13px] text-[var(--color-ink-muted)]">
+                Geocoded, but no street address returned.
+              </p>
+            )}
+          </div>
+        </div>
+      ) : (
+        <p className="mt-2 text-[13px] text-[var(--color-ink-muted)]">
+          Location unavailable —{' '}
+          <span className="italic">geocoding may be disabled or failed.</span>
+        </p>
+      )}
     </div>
   );
 }
