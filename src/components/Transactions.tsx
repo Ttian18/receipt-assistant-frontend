@@ -23,8 +23,10 @@ import DeletedBadge from './DeletedBadge';
 import TransactionsFilters from './TransactionsFilters';
 import {
   DEFAULT_FILTERS,
+  DEFAULT_SORT_ID,
   effectiveDateRange,
   isFilterActive,
+  resolveSort,
   type FilterState,
 } from '../lib/transactionsFilterState';
 
@@ -74,6 +76,9 @@ export default function Transactions({
   const [tombstoneLoading, setTombstoneLoading] = useState(false);
 
   const [filters, setFilters] = useState<FilterState>(DEFAULT_FILTERS);
+  // Sort is view config, not a filter — survives "clear all".
+  const [sortId, setSortId] = useState<string>(DEFAULT_SORT_ID);
+  const activeSort = useMemo(() => resolveSort(sortId), [sortId]);
   const debouncedSearch = useDebouncedValue(searchQuery, 300);
   const debouncedPayee = useDebouncedValue(filters.payeeContains, 300);
   const debouncedAmountMin = useDebouncedValue(filters.amountMinDollars, 300);
@@ -101,11 +106,11 @@ export default function Transactions({
       amount_max_minor: dollarsToMinor(debouncedAmountMax),
       from: dateRange.occurred_from,
       to: dateRange.occurred_to,
-      // Ledger groups rows by ISO-week of `occurred_on`, so the fetch
-      // axis must match — otherwise a freshly re-ingested old receipt
-      // crowds out recently-occurred ones on page 1.
-      sort: 'occurred_on',
-      order: 'desc',
+      // Week-grouped rendering below only makes sense when rows are
+      // sorted by `occurred_on`; for amount / created_at sorts the
+      // render path drops the banners and shows a flat list.
+      sort: activeSort.sort,
+      order: activeSort.order,
     })
       .then((rows) => {
         setTransactions(rows);
@@ -122,6 +127,8 @@ export default function Transactions({
     filters.status,
     dateRange.occurred_from,
     dateRange.occurred_to,
+    activeSort.sort,
+    activeSort.order,
   ]);
 
   useEffect(() => {
@@ -232,6 +239,8 @@ export default function Transactions({
         }}
         showDeleted={showDeleted}
         onToggleShowDeleted={() => setShowDeleted((s) => !s)}
+        sortId={sortId}
+        onSortChange={setSortId}
       />
 
       {rowError && (
@@ -270,7 +279,7 @@ export default function Transactions({
               : 'No entries yet — capture your first receipt.'}
           </p>
         </EmptyState>
-      ) : (
+      ) : activeSort.sort === 'occurred_on' ? (
         <div className="space-y-7">
           {weeks.map((wk) => (
             <WeekGroup
@@ -288,6 +297,25 @@ export default function Transactions({
             />
           ))}
         </div>
+      ) : (
+        <ul className="space-y-2">
+          {filteredTransactions.map((tx) => (
+            <li key={tx.id}>
+              <LedgerRow
+                tx={tx}
+                onSelect={(t) => {
+                  if (t.merchantBrandId && onSelectMerchant) {
+                    onSelectMerchant(t.merchantBrandId);
+                  } else {
+                    onSelectReceipt?.(t.id);
+                  }
+                }}
+                onHardDelete={handleHardDeleteRequest}
+                onUnreconcile={(id) => setUnreconcileTarget(id)}
+              />
+            </li>
+          ))}
+        </ul>
       )}
 
       <ConfirmActionDialog

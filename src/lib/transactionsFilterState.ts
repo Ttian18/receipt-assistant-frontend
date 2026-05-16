@@ -47,6 +47,39 @@ export const STATUS_OPTIONS: { value: RawTransactionStatus; label: string }[] = 
   { value: 'error', label: 'Error' },
 ];
 
+/* ── Sort ─────────────────────────────────────────────────────── */
+// Sort is view config, not a filter, so it lives outside FilterState —
+// the "clear all" button doesn't reset it.
+
+export type SortKey = 'occurred_on' | 'amount' | 'created_at';
+export type SortOrder = 'asc' | 'desc';
+
+export interface SortOption {
+  id: string;
+  // Long form used inside the popover.
+  label: string;
+  // Short form used on the chip itself.
+  chipLabel: string;
+  sort: SortKey;
+  order: SortOrder;
+}
+
+// Amount sort is intentionally absent: backend `GET /v1/transactions`
+// currently only supports `sort=occurred_on | created_at` and returns
+// 501 for `sort=amount` (it requires a subquery over postings). Tracked
+// in the receipt-assistant backend; surface here once that lands.
+export const SORT_OPTIONS: SortOption[] = [
+  { id: 'date-desc',    label: 'Date (newest first)', chipLabel: 'Date ↓',         sort: 'occurred_on', order: 'desc' },
+  { id: 'date-asc',     label: 'Date (oldest first)', chipLabel: 'Date ↑',         sort: 'occurred_on', order: 'asc'  },
+  { id: 'created-desc', label: 'Recently added',      chipLabel: 'Recently added', sort: 'created_at',  order: 'desc' },
+];
+
+export const DEFAULT_SORT_ID = 'date-desc';
+
+export function resolveSort(id: string): SortOption {
+  return SORT_OPTIONS.find((o) => o.id === id) ?? SORT_OPTIONS[0];
+}
+
 /** Compute the ISO date range that should be sent to the backend
  *  for a given filter state. Returns undefined values for "no bound". */
 export function effectiveDateRange(

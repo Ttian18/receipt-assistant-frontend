@@ -2,7 +2,10 @@ import { useEffect, useRef, useState } from 'react';
 import { cn } from '../lib/utils';
 import {
   DATE_PRESET_LABEL,
+  DEFAULT_SORT_ID,
+  SORT_OPTIONS,
   STATUS_OPTIONS,
+  resolveSort,
   type DatePreset,
   type FilterState,
 } from '../lib/transactionsFilterState';
@@ -37,6 +40,8 @@ interface TransactionsFiltersProps {
   onClear: () => void;
   showDeleted: boolean;
   onToggleShowDeleted: () => void;
+  sortId: string;
+  onSortChange: (id: string) => void;
 }
 
 /**
@@ -53,13 +58,18 @@ export default function TransactionsFilters({
   onClear,
   showDeleted,
   onToggleShowDeleted,
+  sortId,
+  onSortChange,
 }: TransactionsFiltersProps) {
-  const [openPopover, setOpenPopover] = useState<'date' | 'type' | 'category' | null>(null);
+  const [openPopover, setOpenPopover] = useState<'date' | 'type' | 'category' | 'sort' | null>(null);
   const [moreOpen, setMoreOpen] = useState(false);
 
   const dateRef = useClickAway(() => setOpenPopover((p) => (p === 'date' ? null : p)));
   const typeRef = useClickAway(() => setOpenPopover((p) => (p === 'type' ? null : p)));
   const categoryRef = useClickAway(() => setOpenPopover((p) => (p === 'category' ? null : p)));
+  const sortRef = useClickAway(() => setOpenPopover((p) => (p === 'sort' ? null : p)));
+
+  const activeSort = resolveSort(sortId);
 
   const dateLabel =
     filters.datePreset === 'custom'
@@ -277,6 +287,42 @@ export default function TransactionsFilters({
             )}
           </div>
         )}
+
+        {/* Sort chip — view config, not a filter, so it lives outside FilterState
+            and isn't reset by "clear all". */}
+        <div ref={sortRef} className="relative">
+          <Chip
+            data-testid="filter-sort"
+            active={sortId !== DEFAULT_SORT_ID}
+            onClick={() => setOpenPopover((p) => (p === 'sort' ? null : 'sort'))}
+          >
+            <span className="text-[var(--color-ink-muted)] mr-1">Sort:</span>
+            {activeSort.chipLabel}
+          </Chip>
+          {openPopover === 'sort' && (
+            <Popover testid="filter-sort-popover">
+              {SORT_OPTIONS.map((opt) => (
+                <button
+                  type="button"
+                  key={opt.id}
+                  data-testid={`filter-sort-${opt.id}`}
+                  onClick={() => {
+                    onSortChange(opt.id);
+                    setOpenPopover(null);
+                  }}
+                  className={cn(
+                    'w-full text-left px-3 py-2 rounded-[10px] text-sm transition-colors',
+                    sortId === opt.id
+                      ? 'bg-[var(--color-terracotta-soft)] text-[var(--color-terracotta-deep)] font-medium'
+                      : 'text-[var(--color-ink)] hover:bg-[var(--color-paper-deep)]',
+                  )}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </Popover>
+          )}
+        </div>
 
         <Chip
           data-testid="toggle-show-deleted"
