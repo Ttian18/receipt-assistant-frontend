@@ -43,7 +43,11 @@ export default function Dashboard({ onSelectReceipt, onSelectMerchant, onViewAll
 
   useEffect(() => {
     Promise.all([
-      fetchTransactions({ limit: 4, from: monthRange.from, to: monthRange.to }),
+      // Recent = freshly-uploaded / re-processed, not "this month's
+      // activity". Ride the `created_at desc` default with no month
+      // filter so a receipt with `occurred_on` years ago still bubbles
+      // to the top right after upload.
+      fetchTransactions({ limit: 4 }),
       fetchSummary({ from: monthRange.from, to: monthRange.to }),
     ])
       .then(([txs, sum]) => {
@@ -307,7 +311,7 @@ function RecentList({
     return (
       <div className="rounded-[18px] border border-[var(--color-rule)] bg-[var(--color-surface)] px-5 py-6 text-center">
         <p className="font-display italic text-[var(--color-ink-muted)]">
-          No entries this month yet.
+          Nothing here yet.
         </p>
       </div>
     );
