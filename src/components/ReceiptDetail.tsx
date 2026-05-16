@@ -6,11 +6,13 @@ import {
   documentContentUrl,
   extractProblemMessage,
   getTransaction,
+  postReExtractDocument,
   toReceiptView,
   voidTransaction,
   restoreDocument,
   type ReceiptView,
   type BackendTransaction,
+  type ReExtractDocumentResult,
 } from '../lib/api';
 import { statusBadge } from '../lib/transactionStatus';
 import { cn } from '../lib/utils';
@@ -61,6 +63,16 @@ export default function ReceiptDetail({ receiptId, onBack, onSelectMerchant, onA
   const [activeDialog, setActiveDialog] = useState<'edit' | 'void' | 'delete' | null>(null);
   const [restoring, setRestoring] = useState(false);
   const [restoreError, setRestoreError] = useState<string | null>(null);
+  // Re-extract state machine. `idle` armed; `pending` (~30-60s — the
+  // agent re-OCRs the image); `success` shows `changed_keys` toast;
+  // `error` flashes the problem-detail message. Mirrors the
+  // refresh-from-source pattern on MerchantDetail.
+  const [reExtractState, setReExtractState] = useState<
+    | { kind: 'idle' }
+    | { kind: 'pending' }
+    | { kind: 'success'; changedKeys: string[]; ocrChanged: boolean }
+    | { kind: 'error'; message: string }
+  >({ kind: 'idle' });
 
   const loadReceipt = () => {
     fetchReceiptDetail(receiptId)
@@ -105,6 +117,36 @@ export default function ReceiptDetail({ receiptId, onBack, onSelectMerchant, onA
       setRestoreError(extractProblemMessage(err));
     } finally {
       setRestoring(false);
+    }
+  };
+
+  const handleReExtract = async () => {
+    if (!receipt?.documentId) return;
+    if (reExtractState.kind === 'pending') return;
+    setReExtractState({ kind: 'pending' });
+    try {
+      const result: ReExtractDocumentResult = await postReExtractDocument(
+        receipt.documentId,
+      );
+      // Reload the transaction so the UI reflects any field changes the
+      // agent committed (payee, occurred_on, occurred_at, etc).
+      loadReceipt();
+      onAfterMutation?.();
+      setReExtractState({
+        kind: 'success',
+        changedKeys: result.changed_keys,
+        ocrChanged: result.ocr_text_changed,
+      });
+      setTimeout(() => {
+        setReExtractState((s) =>
+          s.kind === 'success' ? { kind: 'idle' } : s,
+        );
+      }, 6000);
+    } catch (err: unknown) {
+      setReExtractState({
+        kind: 'error',
+        message: extractProblemMessage(err),
+      });
     }
   };
 
@@ -237,6 +279,55 @@ export default function ReceiptDetail({ receiptId, onBack, onSelectMerchant, onA
       {!isProcessing && receipt.documentId && (
         <OriginalReceiptCollapsible documentId={receipt.documentId} />
       )}
+
+      {/* Re-extract affordance. Only on active (non-voided) receipts
+          that have a linked document. Wall-time is ~30-60s for vision
+          OCR, so we make the pending state visible. */}
+      {!isProcessing &&
+        receipt.documentId &&
+        receipt.status !== 'voided' && (
+          <div className="space-y-2">
+            <button
+              type="button"
+              onClick={handleReExtract}
+              disabled={reExtractState.kind === 'pending'}
+              className={cn(
+                'group inline-flex items-center gap-2 text-[11px] uppercase tracking-[0.16em]',
+                'text-[var(--color-ink-muted)] hover:text-[var(--color-terracotta)]',
+                'transition-colors disabled:opacity-50 disabled:cursor-wait',
+              )}
+              title="Re-run OCR with the current model and prompt"
+            >
+              <span className="font-display italic text-base leading-none text-[var(--color-terracotta)] group-hover:translate-x-px transition-transform">
+                ↺
+              </span>
+              {reExtractState.kind === 'pending'
+                ? 're-extracting… (~30-60s)'
+                : 'Re-extract'}
+            </button>
+
+            {reExtractState.kind === 'success' && (
+              <ReExtractBanner
+                tone="success"
+                onDismiss={() => setReExtractState({ kind: 'idle' })}
+              >
+                {reExtractState.changedKeys.length === 0 && !reExtractState.ocrChanged
+                  ? 'No changes — the agent produced the same output.'
+                  : reExtractState.changedKeys.length === 0
+                    ? 'OCR text refreshed; no transaction fields changed.'
+                    : `Updated ${reExtractState.changedKeys.join(', ')}.`}
+              </ReExtractBanner>
+            )}
+            {reExtractState.kind === 'error' && (
+              <ReExtractBanner
+                tone="error"
+                onDismiss={() => setReExtractState({ kind: 'idle' })}
+              >
+                {reExtractState.message}
+              </ReExtractBanner>
+            )}
+          </div>
+        )}
 
       {!isProcessing && (rawText || confidence != null) && (
         <ExtractionDetailsCollapsible
@@ -814,6 +905,44 @@ function Banner({
       )}
     >
       {children}
+    </div>
+  );
+}
+
+/**
+ * Feedback banner for re-extract. Mirrors the RefreshBanner pattern
+ * in MerchantDetail — same aesthetic, separate copy to avoid pulling
+ * a tiny presentational helper across the file boundary. If a third
+ * surface needs the same widget, factor it out then.
+ */
+function ReExtractBanner({
+  tone,
+  children,
+  onDismiss,
+}: {
+  tone: 'success' | 'error';
+  children: React.ReactNode;
+  onDismiss: () => void;
+}) {
+  return (
+    <div
+      className={cn(
+        'flex items-start justify-between gap-3 rounded-[14px] px-4 py-3 text-sm',
+        tone === 'success' &&
+          'border border-[var(--color-terracotta)]/30 bg-[var(--color-terracotta)]/8 text-[var(--color-ink)]',
+        tone === 'error' &&
+          'border border-[var(--color-stamp)]/40 bg-[var(--color-stamp)]/5 text-[var(--color-stamp)]',
+      )}
+    >
+      <p className="font-hand text-base leading-snug">{children}</p>
+      <button
+        type="button"
+        onClick={onDismiss}
+        className="text-[11px] uppercase tracking-[0.16em] opacity-60 hover:opacity-100 transition-opacity shrink-0 mt-0.5"
+        aria-label="Dismiss"
+      >
+        dismiss
+      </button>
     </div>
   );
 }

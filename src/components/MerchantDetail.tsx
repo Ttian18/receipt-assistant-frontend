@@ -7,9 +7,11 @@ import {
   patchPlace,
   pickCjk,
   placeName,
+  postRefreshPlace,
   type MerchantDetailResponse,
   type MerchantTransactionRow,
   type PlaceFull,
+  type RefreshPlaceResult,
 } from '../lib/api';
 import { CATEGORY_META } from '../categoryMeta';
 import type { Category } from '../types';
@@ -29,6 +31,16 @@ export default function MerchantDetail({ brandId, onBack, onSelectReceipt }: Mer
   const [place, setPlace] = useState<PlaceFull | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // "Refresh from source" state machine. `idle` (the button is
+  // armed), `pending` (Google call in flight, ~5-10s), `success`
+  // (banner with `changed_keys`, auto-fades), `error` (banner with
+  // problem-detail message, manual dismiss).
+  const [refreshState, setRefreshState] = useState<
+    | { kind: 'idle' }
+    | { kind: 'pending' }
+    | { kind: 'success'; changedKeys: string[] }
+    | { kind: 'error'; message: string }
+  >({ kind: 'idle' });
 
   useEffect(() => {
     let cancelled = false;
@@ -64,6 +76,33 @@ export default function MerchantDetail({ brandId, onBack, onSelectReceipt }: Mer
       cancelled = true;
     };
   }, [brandId]);
+
+  const onRefreshFromSource = async () => {
+    if (!place) return;
+    if (refreshState.kind === 'pending') return;
+    setRefreshState({ kind: 'pending' });
+    try {
+      const result: RefreshPlaceResult = await postRefreshPlace(place.id);
+      // Pull the refreshed place so subtitle / Chinese name reflect the
+      // new data; the backend already returns derivation_event_id but
+      // the actual row contents come from a re-fetch.
+      const fresh = await fetchPlace(place.id);
+      setPlace(fresh);
+      setRefreshState({ kind: 'success', changedKeys: result.changed_keys });
+      // Auto-dismiss the banner after 5s; user can still scroll the
+      // page in the meantime. Cleared on next refresh attempt too.
+      setTimeout(() => {
+        setRefreshState((s) =>
+          s.kind === 'success' ? { kind: 'idle' } : s,
+        );
+      }, 5000);
+    } catch (e) {
+      setRefreshState({
+        kind: 'error',
+        message: extractProblemMessage(e),
+      });
+    }
+  };
 
   const onEditChineseName = async () => {
     if (!place) return;
@@ -213,6 +252,54 @@ export default function MerchantDetail({ brandId, onBack, onSelectReceipt }: Mer
         </a>
       )}
 
+      {/* Refresh from Google source. Only when a place is linked —
+          without one there's nothing to re-fetch. Wears the same
+          editorial italic-display + hand-written aesthetic as the
+          rest of the page. */}
+      {place && (
+        <div className="space-y-2">
+          <button
+            type="button"
+            onClick={onRefreshFromSource}
+            disabled={refreshState.kind === 'pending'}
+            className={cn(
+              'group inline-flex items-center gap-2 text-[11px] uppercase tracking-[0.16em]',
+              'text-[var(--color-ink-muted)] hover:text-[var(--color-terracotta)]',
+              'transition-colors disabled:opacity-50 disabled:cursor-wait',
+            )}
+            title="Re-fetch Google data and re-derive multilingual fields"
+          >
+            <span className="font-display italic text-base leading-none text-[var(--color-terracotta)] group-hover:translate-x-px transition-transform">
+              ↻
+            </span>
+            {refreshState.kind === 'pending'
+              ? 'refreshing from Google…'
+              : 'Refresh from source'}
+          </button>
+
+          {refreshState.kind === 'success' && (
+            <RefreshBanner
+              tone="success"
+              onDismiss={() => setRefreshState({ kind: 'idle' })}
+            >
+              {refreshState.changedKeys.length === 0
+                ? 'Google had nothing new.'
+                : `Updated ${refreshState.changedKeys.length} field${
+                    refreshState.changedKeys.length === 1 ? '' : 's'
+                  }: ${refreshState.changedKeys.join(', ')}.`}
+            </RefreshBanner>
+          )}
+          {refreshState.kind === 'error' && (
+            <RefreshBanner
+              tone="error"
+              onDismiss={() => setRefreshState({ kind: 'idle' })}
+            >
+              {refreshState.message}
+            </RefreshBanner>
+          )}
+        </div>
+      )}
+
       {/* Transaction history */}
       <div className="space-y-3">
         <h2 className="font-display italic font-medium text-xl leading-none">
@@ -339,4 +426,41 @@ function formatDay(isoDate: string): string {
   if (!Number.isFinite(y) || !Number.isFinite(m) || !Number.isFinite(d)) return isoDate;
   const dt = new Date(y, m - 1, d);
   return dt.toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+/**
+ * Reprocess feedback banner. Matches the editorial / handwritten
+ * aesthetic of the page — terracotta success accent, stamped red for
+ * errors. Used by both refresh (here) and re-extract (ReceiptDetail).
+ */
+function RefreshBanner({
+  tone,
+  children,
+  onDismiss,
+}: {
+  tone: 'success' | 'error';
+  children: React.ReactNode;
+  onDismiss: () => void;
+}) {
+  return (
+    <div
+      className={cn(
+        'flex items-start justify-between gap-3 rounded-[14px] px-4 py-3 text-sm',
+        tone === 'success' &&
+          'border border-[var(--color-terracotta)]/30 bg-[var(--color-terracotta)]/8 text-[var(--color-ink)]',
+        tone === 'error' &&
+          'border border-[var(--color-stamp)]/40 bg-[var(--color-stamp)]/5 text-[var(--color-stamp)]',
+      )}
+    >
+      <p className="font-hand text-base leading-snug">{children}</p>
+      <button
+        type="button"
+        onClick={onDismiss}
+        className="text-[11px] uppercase tracking-[0.16em] opacity-60 hover:opacity-100 transition-opacity shrink-0 mt-0.5"
+        aria-label="Dismiss"
+      >
+        dismiss
+      </button>
+    </div>
+  );
 }

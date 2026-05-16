@@ -1150,6 +1150,59 @@ export async function patchPlace(
   return unwrap('patchPlace', data, error, response.status);
 }
 
+export type RefreshPlaceResult = components['schemas']['RefreshPlaceResponse'];
+
+/**
+ * Re-fetch a place from Google v1 and re-derive Layer 2 (Phase 4a / #91).
+ *
+ * Triggers one round of Google API quota usage per call; the merchant /
+ * place detail page surfaces this as "Refresh from source" so the user
+ * understands it's a quota-spending operation.
+ *
+ * Errors surface as RFC 7807 problem+json:
+ *  - 404 — place not found
+ *  - 503 — server has no GOOGLE_MAPS_API_KEY configured
+ *  - 502 — upstream Google error (status passed through in `upstream_status`)
+ *
+ * Layer-3 protections inherited from the backend:
+ *  - `custom_name_zh` and OCR-sourced zh fields survive
+ *  - `derivation_events` row written even on no-op refresh
+ */
+export async function postRefreshPlace(id: string): Promise<RefreshPlaceResult> {
+  const { data, error, response } = await client.POST(
+    '/v1/places/{id}/refresh',
+    { params: { path: { id } } },
+  );
+  return unwrap('postRefreshPlace', data, error, response.status);
+}
+
+export type ReExtractDocumentResult =
+  components['schemas']['ReExtractDocumentResponse'];
+
+/**
+ * Re-OCR a document and UPDATE the linked transaction in place (Phase
+ * 4c / #91). Wall-time ~30-60s — callers should show a pending state.
+ *
+ * Layer-3 protections inherited from the backend:
+ *  - HARD fields (status, void state, narration, trip_id) never touched
+ *  - SOFT fields (payee, occurred_on, occurred_at) preserved if the user
+ *    PATCHed them via `patchTransaction` (the `metadata.user_edited`
+ *    flag is set automatically by that path)
+ *
+ * Errors surface as RFC 7807 problem+json:
+ *  - 404 — document not found or soft-deleted
+ *  - 422 — zero or >1 linked transactions, or document has no file_path
+ */
+export async function postReExtractDocument(
+  id: string,
+): Promise<ReExtractDocumentResult> {
+  const { data, error, response } = await client.POST(
+    '/v1/documents/{id}/re-extract',
+    { params: { path: { id } } },
+  );
+  return unwrap('postReExtractDocument', data, error, response.status);
+}
+
 /**
  * Fallback chain for rendering a place's name in the UI:
  *   custom_name_zh  → user override (always wins)

@@ -1462,6 +1462,65 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/documents/{id}/re-extract": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Re-OCR the receipt and UPDATE the linked transaction in place.
+         * @description Phase 4c of the 3-layer rollout (#80 / #91). Spawns `claude -p` with a narrow re-extract prompt; the agent reads the cached image bytes and refreshes `transactions.{payee, occurred_on, occurred_at, metadata.extraction}` plus `documents.{ocr_text, ocr_model_version}`. **Out of scope**: postings, place_id, merchant_id, document_links — those have their own paths. **Layer-3 shielded**: HARD fields (status, narration, trip_id, identity columns) never touched; SOFT fields (occurred_on, occurred_at, payee) protected by `metadata.user_edited.<field>` CASE expressions, so user PATCH overrides survive. Returns 422 if the document has zero or >1 linked transactions.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Re-extract committed */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ReExtractDocumentResponse"];
+                    };
+                };
+                /** @description Document not found or soft-deleted */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Document not linked to exactly one transaction, or has no file_path */
+                422: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/ingest/batch": {
         parameters: {
             query?: never;
@@ -2346,6 +2405,133 @@ export interface paths {
         };
         trace?: never;
     };
+    "/v1/places/{id}/re-derive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Re-run Layer 2 projection over cached raw_response.
+         * @description Re-applies the current projection logic to the cached Google Places response, overwriting derived columns. Layer 3 user-truth (`custom_name_zh`) is never touched. OCR-sourced zh fields (`display_name_zh_source IN ('photo_ocr','receipt_ocr')`) are preserved verbatim. Every run inserts a `derivation_events` row with a `before`/`after` jsonb diff; the returned `derivation_event_id` lets you correlate. Returns 422 when `raw_response` is NULL.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Re-derive committed */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ReDerivePlaceResponse"];
+                    };
+                };
+                /** @description Place not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Place has no raw_response — nothing to project from */
+                422: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/places/{id}/refresh": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Re-fetch Google v1 + re-derive Layer 2 in one step.
+         * @description Calls Google Places v1 (dual-language, FieldMask=*), appends a `place_snapshots` row, overwrites `places.raw_response`, then delegates to `/v1/places/{id}/re-derive` so Layer 2 columns reflect the new body. Layer 3 (`custom_name_zh`) and OCR-sourced zh fields are shielded by the re-derive step. Yelp re-fetch is deferred until a Yelp client lands (separate epic). Returns 503 when `GOOGLE_MAPS_API_KEY` is unset and 502 on upstream errors.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Refresh committed */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["RefreshPlaceResponse"];
+                    };
+                };
+                /** @description Place not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Google v1 upstream error */
+                502: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description GOOGLE_MAPS_API_KEY not configured */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/places/{id}/photos/{rank}/content": {
         parameters: {
             query?: never;
@@ -2391,6 +2577,56 @@ export interface paths {
         };
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/re-derive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Re-run Layer 2 projection across every row in scope.
+         * @description Phase 2 (#89): scope=places walks every `places` row and re-runs the projection over its cached `raw_response`. Rows with `raw_response IS NULL` are counted as `skipped` (not errored). Each updated row produces a `derivation_events` entry — including no-op runs that match the current state, so a version bump is auditable even when nothing visibly changes. Sync execution at current corpus scale (<1 s for tens to low hundreds of places).
+         */
+        post: {
+            parameters: {
+                query?: {
+                    scope?: "places";
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Batch summary */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ReDeriveBatchResponse"];
+                    };
+                };
+                /** @description Invalid scope */
+                422: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+            };
+        };
         delete?: never;
         options?: never;
         head?: never;
@@ -2796,6 +3032,8 @@ export interface components {
             mime_type: string | null;
             sha256: string;
             ocr_text: string | null;
+            /** @description Model identifier under which ocr_text was produced. NULL on legacy rows. */
+            ocr_model_version: string | null;
             extraction_meta: {
                 [key: string]: unknown;
             } | null;
@@ -3400,8 +3638,76 @@ export interface components {
             amount_base_minor?: number;
             memo?: string | null;
         };
+        ReExtractDocumentResponse: {
+            /**
+             * Format: uuid
+             * @example 01HXY9F0ABCDEFGHJKMNPQRSTV
+             */
+            document_id: string;
+            /**
+             * Format: uuid
+             * @example 01HXY9F0ABCDEFGHJKMNPQRSTV
+             */
+            transaction_id: string;
+            /**
+             * Format: uuid
+             * @example 01HXY9F0ABCDEFGHJKMNPQRSTV
+             */
+            derivation_event_id: string;
+            changed_keys: string[];
+            ocr_text_changed: boolean;
+            /**
+             * Format: uuid
+             * @example 01HXY9F0ABCDEFGHJKMNPQRSTV
+             */
+            session_id: string;
+        };
         UpdatePlaceRequest: {
             custom_name_zh?: string | null;
+        };
+        ReDerivePlaceResponse: {
+            /**
+             * Format: uuid
+             * @example 01HXY9F0ABCDEFGHJKMNPQRSTV
+             */
+            place_id: string;
+            changed_keys: string[];
+            /**
+             * Format: uuid
+             * @example 01HXY9F0ABCDEFGHJKMNPQRSTV
+             */
+            derivation_event_id: string;
+        };
+        RefreshPlaceResponse: {
+            /**
+             * Format: uuid
+             * @example 01HXY9F0ABCDEFGHJKMNPQRSTV
+             */
+            place_id: string;
+            google_place_id: string;
+            /**
+             * Format: uuid
+             * @example 01HXY9F0ABCDEFGHJKMNPQRSTV
+             */
+            snapshot_id: string;
+            /**
+             * Format: uuid
+             * @example 01HXY9F0ABCDEFGHJKMNPQRSTV
+             */
+            derivation_event_id: string;
+            changed_keys: string[];
+        };
+        ReDeriveBatchResponse: {
+            /** @enum {string} */
+            scope: "places";
+            total: number;
+            updated: number;
+            skipped: number;
+            errors: {
+                id: string;
+                message: string;
+            }[];
+            ran_at: string;
         };
     };
     responses: never;
