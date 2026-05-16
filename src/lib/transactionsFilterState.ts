@@ -64,14 +64,15 @@ export interface SortOption {
   order: SortOrder;
 }
 
-// Amount sort is intentionally absent: backend `GET /v1/transactions`
-// currently only supports `sort=occurred_on | created_at` and returns
-// 501 for `sort=amount` (it requires a subquery over postings). Tracked
-// in the receipt-assistant backend; surface here once that lands.
+// Amount sort key on the backend is MAX(ABS(amount_base_minor)) per
+// transaction — the largest leg. Same axis as the amount_min/max
+// filters, so filtering and sorting agree on what "amount" means.
 export const SORT_OPTIONS: SortOption[] = [
-  { id: 'date-desc',    label: 'Date (newest first)', chipLabel: 'Date ↓',         sort: 'occurred_on', order: 'desc' },
-  { id: 'date-asc',     label: 'Date (oldest first)', chipLabel: 'Date ↑',         sort: 'occurred_on', order: 'asc'  },
-  { id: 'created-desc', label: 'Recently added',      chipLabel: 'Recently added', sort: 'created_at',  order: 'desc' },
+  { id: 'date-desc',    label: 'Date (newest first)',     chipLabel: 'Date ↓',         sort: 'occurred_on', order: 'desc' },
+  { id: 'date-asc',     label: 'Date (oldest first)',     chipLabel: 'Date ↑',         sort: 'occurred_on', order: 'asc'  },
+  { id: 'amount-desc',  label: 'Amount (largest first)',  chipLabel: 'Amount ↓',       sort: 'amount',      order: 'desc' },
+  { id: 'amount-asc',   label: 'Amount (smallest first)', chipLabel: 'Amount ↑',       sort: 'amount',      order: 'asc'  },
+  { id: 'created-desc', label: 'Recently added',          chipLabel: 'Recently added', sort: 'created_at',  order: 'desc' },
 ];
 
 export const DEFAULT_SORT_ID = 'date-desc';
