@@ -15,6 +15,7 @@ import { cn } from '../lib/utils';
 import type { Transaction } from '../types';
 import { isProcessing as txIsProcessing, statusBadge } from '../lib/transactionStatus';
 import { CategoryIcon } from './CategoryIcon';
+import { PlaceThumbnail } from './PlaceThumbnail';
 import TransactionRowMenu from './TransactionRowMenu';
 import ConfirmActionDialog from './ConfirmActionDialog';
 import UnreconcileDialog from './UnreconcileDialog';
@@ -477,13 +478,29 @@ function LedgerRow({
         'rounded-[16px] border border-[var(--color-rule)] bg-[var(--color-surface)] p-3 pr-2',
       )}
     >
-      {/* Category icon (with optional has-receipt ✦ badge) */}
+      {/* Place thumbnail when geocoded; category icon otherwise (#96).
+          Optional has-receipt ✦ badge sits on top of either. */}
       <div className="relative h-12 w-12 flex-shrink-0">
-        <CategoryIcon
-          category={tx.category}
-          transactionType={tx.transactionType}
-          size={48}
-        />
+        {tx.placeMapUrl ? (
+          <PlaceThumbnail
+            src={tx.placeMapUrl}
+            alt={tx.description}
+            size={48}
+            fallback={
+              <CategoryIcon
+                category={tx.category}
+                transactionType={tx.transactionType}
+                size={48}
+              />
+            }
+          />
+        ) : (
+          <CategoryIcon
+            category={tx.category}
+            transactionType={tx.transactionType}
+            size={48}
+          />
+        )}
         {hasDoc && (
           <span
             className={cn(

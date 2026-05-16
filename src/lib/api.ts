@@ -365,6 +365,13 @@ export function mapTransaction(t: BackendTransaction): Transaction {
     id: t.id,
     description: displayName(t.place, rv.payee ?? rv.narration ?? null),
     placeCity: formatPlaceCity(t.place),
+    // `placeMapUrl` is the proxied Static Maps endpoint that the
+    // row renderer hits via `<PlaceThumbnail>` (#96). Only set when
+    // the place has lat/lng — null falls back to `<CategoryIcon>`.
+    placeMapUrl:
+      t.place?.id && t.place.lat != null && t.place.lng != null
+        ? `/api/v1/places/${t.place.id}/map`
+        : null,
     category: classification.category,
     transactionType: classification.transactionType,
     date: rv.occurred_on,

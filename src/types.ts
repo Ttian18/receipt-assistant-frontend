@@ -42,6 +42,11 @@ export interface Transaction {
    *  best-effort). Used as a row-subtitle fallback in Apple-Wallet
    *  style when `paymentMethod` is unavailable. */
   placeCity?: string | null;
+  /** Proxied Google Static Maps URL (#96) for a small map thumbnail
+   *  of the place. Null when the transaction has no linked place or
+   *  no lat/lng. Row renderers swap `<CategoryIcon />` for
+   *  `<PlaceThumbnail src={placeMapUrl} />` when this is set. */
+  placeMapUrl?: string | null;
   amount: number;
   /** Single source of truth for state. UI-visible status labels are derived
    *  via `statusBadge(rawStatus)` from `src/lib/transactionStatus.ts`. */

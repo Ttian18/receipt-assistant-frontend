@@ -2532,6 +2532,94 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/places/{id}/map": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Stream a Google Static Maps thumbnail for a place (#96).
+         * @description Proxies Google Static Maps. Server-side caches the PNG to disk keyed on (place_id, lat, lng, size, zoom, marker) so subsequent requests don't hit Google. Image is rendered at 2× scale for retina; POI text labels suppressed. Marker is an orange dot at the place's coords. Returns 404 when the place has no lat/lng, 400 for bad size/zoom, 502 on Google upstream error, 503 when the server has no GOOGLE_MAPS_API_KEY configured.
+         */
+        get: {
+            parameters: {
+                query?: {
+                    size?: string;
+                    zoom?: string;
+                    marker?: string;
+                };
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description PNG image bytes */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "image/png": string;
+                    };
+                };
+                /** @description Not modified — ETag matched */
+                304: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Bad size or zoom */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Place not found or has no lat/lng */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Google Static Maps upstream error */
+                502: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description GOOGLE_MAPS_API_KEY not configured */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/places/{id}/photos/{rank}/content": {
         parameters: {
             query?: never;
