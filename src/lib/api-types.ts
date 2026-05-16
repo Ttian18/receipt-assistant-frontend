@@ -1691,7 +1691,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Resolve the preferred icon and stream it (501 until #101 Phase 2) */
+        /**
+         * Stream the brand's preferred icon bytes
+         * @description Resolves preferred_asset_id and streams the file. 404 when the brand is missing, no asset is preferred, the asset is retired, or the file is missing on disk. Frontend falls back to CategoryIcon on 404 — never to a different candidate.
+         */
         get: {
             parameters: {
                 query?: never;
@@ -1710,17 +1713,8 @@ export interface paths {
                     };
                     content?: never;
                 };
-                /** @description Brand or preferred asset missing */
+                /** @description Brand or icon unavailable */
                 404: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/problem+json": components["schemas"]["ProblemDetails"];
-                    };
-                };
-                /** @description Streaming not implemented yet */
-                501: {
                     headers: {
                         [name: string]: unknown;
                     };
@@ -2992,7 +2986,55 @@ export interface paths {
         delete?: never;
         options?: never;
         head?: never;
-        patch?: never;
+        /**
+         * Update a merchant — brand-level Layer-3 custom_name override (#79)
+         * @description Currently only `custom_name` is editable. Other merchant fields are agent-owned via the ingest extractor and not user-editable from this endpoint. Pass `custom_name: null` to clear the override.
+         */
+        patch: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["UpdateMerchantRequest"];
+                    "application/merge-patch+json": components["schemas"]["UpdateMerchantRequest"];
+                };
+            };
+            responses: {
+                /** @description Updated merchant */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Merchant"];
+                    };
+                };
+                /** @description No editable fields supplied */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Merchant not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+            };
+        };
         trace?: never;
     };
     "/v1/merchants/{id}/photo": {
@@ -4644,6 +4686,7 @@ export interface components {
             enrichment_status: "pending" | "success" | "not_found" | "failed";
             /** Format: date-time */
             enrichment_attempted_at: string | null;
+            custom_name: string | null;
             /** Format: date-time */
             created_at: string;
             /** Format: date-time */
@@ -4681,6 +4724,9 @@ export interface components {
         MerchantTransactionsResponse: {
             items: components["schemas"]["MerchantTransactionRow"][];
             next_cursor: string | null;
+        };
+        UpdateMerchantRequest: {
+            custom_name?: string | null;
         };
         NewPosting: {
             /**

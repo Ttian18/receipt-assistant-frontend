@@ -4,6 +4,7 @@ import {
   fetchMerchant,
   fetchMerchantTransactions,
   fetchPlace,
+  patchMerchant,
   patchPlace,
   pickCjk,
   placeName,
@@ -104,16 +105,17 @@ export default function MerchantDetail({ brandId, onBack, onSelectReceipt }: Mer
     }
   };
 
-  // The legacy hero "pencil" affordance. Originally Chinese-only;
-  // post-#79 the column is language-agnostic, so any string is fine.
-  // A dedicated inline-rename modal from transaction rows lands in
-  // a follow-up PR (#79 MVP A).
-  const onEditName = async () => {
+  // Place-level rename (#79 Phase B). Targets a SINGLE branch's
+  // display name. Use this only when one location specifically needs
+  // a different name from the brand-wide rename — e.g. "Costco
+  // Wholesale Burbank" specifically vs. "Costco" everywhere else.
+  // Most users want the brand-level rename below instead.
+  const onEditPlaceName = async () => {
     if (!place) return;
     const current =
       place.custom_name ?? place.custom_name_zh ?? pickCjk(place.display_name_zh) ?? '';
     const next = window.prompt(
-      'Your name for this merchant (clear to remove override):',
+      'Override the name FOR THIS LOCATION only (clear to remove):',
       current,
     );
     if (next === null) return; // user cancelled
@@ -122,6 +124,32 @@ export default function MerchantDetail({ brandId, onBack, onSelectReceipt }: Mer
         custom_name: next.trim() === '' ? null : next.trim(),
       });
       setPlace(updated);
+    } catch (e) {
+      window.alert(`Could not save: ${extractProblemMessage(e)}`);
+    }
+  };
+
+  // Brand-level rename (#79 Phase C). Propagates to every place row
+  // sharing this brand_id within the workspace. Works even when
+  // `place_id IS NULL` (Phase D effect). One rename here is the
+  // typical user intent — fixes "Costco" everywhere instead of
+  // having to override 5 separate place rows.
+  const onEditBrandName = async () => {
+    if (!detail) return;
+    const current = detail.merchant.custom_name ?? detail.merchant.canonical_name ?? '';
+    const next = window.prompt(
+      `Rename "${detail.merchant.canonical_name}" everywhere (clear to remove override):`,
+      current,
+    );
+    if (next === null) return; // user cancelled
+    try {
+      const updated = await patchMerchant(detail.merchant.id, {
+        custom_name: next.trim() === '' ? null : next.trim(),
+      });
+      setDetail({
+        ...detail,
+        merchant: { ...detail.merchant, ...updated },
+      });
     } catch (e) {
       window.alert(`Could not save: ${extractProblemMessage(e)}`);
     }
@@ -186,12 +214,21 @@ export default function MerchantDetail({ brandId, onBack, onSelectReceipt }: Mer
               {category}
             </p>
           )}
-          <h1 className={cn(
-            'font-display italic font-medium text-3xl sm:text-4xl leading-tight tracking-tight',
-            m.photo_url ? 'text-white' : 'text-white',
-          )}>
-            {m.canonical_name}
-          </h1>
+          <button
+            type="button"
+            onClick={onEditBrandName}
+            title={
+              m.custom_name
+                ? `You renamed this brand to "${m.custom_name}". Click to edit.`
+                : `Click to rename "${m.canonical_name}" everywhere.`
+            }
+            className={cn(
+              'block text-left font-display italic font-medium text-3xl sm:text-4xl leading-tight tracking-tight transition-colors',
+              m.photo_url ? 'text-white hover:text-white/80' : 'text-white hover:text-white/80',
+            )}
+          >
+            {m.custom_name ?? m.canonical_name}
+          </button>
           {(() => {
             // Chinese-name subtitle. Renders when the linked place has
             // any source of a non-English display name (Google zh-CN,
@@ -217,9 +254,9 @@ export default function MerchantDetail({ brandId, onBack, onSelectReceipt }: Mer
             return (
               <button
                 type="button"
-                onClick={onEditName}
+                onClick={onEditPlaceName}
                 className="mt-1 inline-flex items-center gap-2 group"
-                title={zh ? `Source: ${source}. Click to edit.` : 'Add a name override'}
+                title={zh ? `Source: ${source}. Click to edit (per-location override).` : 'Add a per-location override'}
               >
                 {zh ? (
                   <>

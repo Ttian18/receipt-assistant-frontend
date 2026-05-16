@@ -235,13 +235,45 @@ export function displayName(
       }
     | null
     | undefined,
-  fallback: string | null,
-  userLangs: readonly ('zh' | 'en')[] = ['zh', 'en'],
+  fallbackOrMerchant:
+    | string
+    | null
+    | { custom_name?: string | null; canonical_name?: string | null }
+    | undefined,
+  fallbackOrLangs?: string | null | readonly ('zh' | 'en')[],
+  userLangsArg: readonly ('zh' | 'en')[] = ['zh', 'en'],
 ): string {
+  // Backward-compat: original signature was (place, fallback, userLangs).
+  // Phase C of #79 adds an optional merchant arg ahead of fallback for
+  // brand-level overrides. Disambiguate based on the type of the
+  // second arg.
+  let merchant:
+    | { custom_name?: string | null; canonical_name?: string | null }
+    | null
+    | undefined;
+  let fallback: string | null;
+  let userLangs: readonly ('zh' | 'en')[];
+  if (
+    fallbackOrMerchant &&
+    typeof fallbackOrMerchant === 'object' &&
+    !Array.isArray(fallbackOrMerchant)
+  ) {
+    merchant = fallbackOrMerchant;
+    fallback = typeof fallbackOrLangs === 'string' ? fallbackOrLangs : null;
+    userLangs = Array.isArray(fallbackOrLangs) ? fallbackOrLangs : userLangsArg;
+  } else {
+    merchant = null;
+    fallback = typeof fallbackOrMerchant === 'string' ? fallbackOrMerchant : null;
+    userLangs = Array.isArray(fallbackOrLangs) ? fallbackOrLangs : userLangsArg;
+  }
+
+  // Layer-3 cascade per #79: per-place override → brand-level override
+  // → derived (Google/OCR) → fallback.
   if (place?.custom_name) return place.custom_name;
   // Backward-compat fallback while the deprecated alias is still
   // emitted by the backend (#79 transition window).
   if (place?.custom_name_zh) return place.custom_name_zh;
+  if (merchant?.custom_name) return merchant.custom_name;
   for (const lang of userLangs) {
     if (lang === 'zh') {
       const zh =
@@ -368,11 +400,12 @@ export function mapTransaction(t: BackendTransaction): Transaction {
   const m = merchantFromTxn(t);
   // Single-name policy (see receipt-assistant-frontend#?): list
   // rows show ONE name, picked by displayName(). No subtitle, no
-  // pinyin alongside. The choice cascades user override → native
-  // CJK → English → glossed CJK → address → receipt payee.
+  // pinyin alongside. The cascade is: place.custom_name →
+  // merchant.custom_name (#79 Phase C) → native CJK → English →
+  // glossed CJK → address → receipt payee.
   return {
     id: t.id,
-    description: displayName(t.place, rv.payee ?? rv.narration ?? null),
+    description: displayName(t.place, m, rv.payee ?? rv.narration ?? null),
     placeCity: formatPlaceCity(t.place),
     // `placeMapUrl` is the proxied Static Maps endpoint that the
     // row renderer hits via `<PlaceThumbnail>` (#96). Only set when
@@ -1146,6 +1179,24 @@ export async function fetchMerchantTransactions(
     },
   );
   return unwrap('fetchMerchantTransactions', data, error, response.status);
+}
+
+/**
+ * Update the user-overridable `custom_name` on a merchant (#79 Phase C).
+ * One rename propagates to every place row under this brand_id within
+ * the workspace — solves the "I've been to 5 Costcos and renamed it 5
+ * times" pain. Per-place override (`patchPlace`) still wins when set.
+ * Pass `null` to clear.
+ */
+export async function patchMerchant(
+  id: string,
+  patch: { custom_name?: string | null },
+): Promise<components['schemas']['Merchant']> {
+  const { data, error, response } = await client.PATCH('/v1/merchants/{id}', {
+    params: { path: { id } },
+    body: patch,
+  });
+  return unwrap('patchMerchant', data, error, response.status);
 }
 
 // ── Multilingual place cache (#74) ─────────────────────────────
