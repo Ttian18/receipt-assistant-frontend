@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { TrendingDown, TrendingUp, Loader2, PieChart as PieIcon } from 'lucide-react';
+import { ChevronLeft, ChevronRight, TrendingDown, TrendingUp, Loader2, PieChart as PieIcon, Receipt } from 'lucide-react';
 import {
   Bar,
   BarChart,
@@ -11,6 +11,7 @@ import {
 import {
   classifyBackendCategory,
   extractProblemMessage,
+  fetchTransactions,
   getCashflowReport,
   getSummaryReport,
   getTrendsReport,
@@ -18,9 +19,10 @@ import {
   type BackendSummaryReport,
   type BackendTrendsReport,
 } from '../lib/api';
-import type { Category } from '../types';
+import type { Category, Transaction } from '../types';
 import { cn } from '../lib/utils';
 import { CategoryIcon } from './CategoryIcon';
+import { MerchantIcon } from './MerchantIcon';
 
 function formatMoney(minor: number, currency = 'USD'): string {
   return (minor / 100).toLocaleString(undefined, {
@@ -63,17 +65,40 @@ interface CategoryRow {
 }
 
 export default function MonthlyReview() {
-  const now = useMemo(() => new Date(), []);
+  // FE#23: month picker — `now` is the FIRST of the selected month so
+  // arithmetic against it is timezone-safe. Defaults to the current
+  // calendar month; user navigates via chevrons. Capped at the current
+  // month so we don't render "review" for the future.
+  const today = useMemo(() => new Date(), []);
+  const currentMonth = useMemo(
+    () => new Date(today.getFullYear(), today.getMonth(), 1),
+    [today],
+  );
+  const [now, setNow] = useState<Date>(currentMonth);
   const prevMonth = useMemo(() => new Date(now.getFullYear(), now.getMonth() - 1, 1), [now]);
+  const canStepForward = now < currentMonth;
+
+  const stepBack = () => setNow(new Date(now.getFullYear(), now.getMonth() - 1, 1));
+  const stepForward = () => {
+    if (!canStepForward) return;
+    setNow(new Date(now.getFullYear(), now.getMonth() + 1, 1));
+  };
 
   const [cashflow, setCashflow] = useState<BackendCashflowReport | null>(null);
   const [trends, setTrends] = useState<BackendTrendsReport | null>(null);
   const [thisMonth, setThisMonth] = useState<BackendSummaryReport | null>(null);
   const [lastMonth, setLastMonth] = useState<BackendSummaryReport | null>(null);
+  // FE#23: full this-month receipt list (sorted by amount desc).
+  // Seeds both the "Notable transactions" section (top-3 spending)
+  // and the Receipts count KPI. ~200-cap on the API call covers all
+  // but the most active months.
+  const [allReceipts, setAllReceipts] = useState<Transaction[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    setLoading(true);
+    setError(null);
     Promise.all([
       getCashflowReport({ from: startOfMonth(sixMonthsAgo(now)), to: endOfMonth(now) }),
       getTrendsReport({
@@ -88,12 +113,22 @@ export default function MonthlyReview() {
         to: endOfMonth(prevMonth),
         groupBy: 'category',
       }),
+      fetchTransactions({
+        from: startOfMonth(now),
+        to: endOfMonth(now),
+        sort: 'amount',
+        order: 'desc',
+        // Pull a full page so the same call seeds Notable (top-3) and
+        // the Receipts count. 200 covers all but the most active months.
+        limit: 200,
+      }),
     ])
-      .then(([cf, tr, thisM, lastM]) => {
+      .then(([cf, tr, thisM, lastM, top]) => {
         setCashflow(cf);
         setTrends(tr);
         setThisMonth(thisM);
         setLastMonth(lastM);
+        setAllReceipts(top);
       })
       .catch((e) => setError(extractProblemMessage(e)))
       .finally(() => setLoading(false));
@@ -152,10 +187,36 @@ export default function MonthlyReview() {
         <h2 className="text-4xl font-extrabold font-headline text-white tracking-tight">
           Monthly Financial Performance
         </h2>
-        <div className="flex items-center gap-4 mt-2">
-          <span className="text-on-surface-variant font-medium">
-            Review for {now.toLocaleDateString(undefined, { month: 'long', year: 'numeric' })}
+        <div className="flex items-center gap-3 mt-2 flex-wrap">
+          {/* FE#23: month picker — prev/next chevrons. Next disables
+              when viewing the current month (can't review the future). */}
+          <button
+            type="button"
+            onClick={stepBack}
+            className="p-1.5 rounded-md text-on-surface-variant hover:text-white hover:bg-surface-container-low transition-colors"
+            aria-label="Previous month"
+            title="Previous month"
+          >
+            <ChevronLeft size={18} />
+          </button>
+          <span className="text-on-surface-variant font-medium min-w-[8rem] text-center">
+            {now.toLocaleDateString(undefined, { month: 'long', year: 'numeric' })}
           </span>
+          <button
+            type="button"
+            onClick={stepForward}
+            disabled={!canStepForward}
+            className={cn(
+              'p-1.5 rounded-md transition-colors',
+              canStepForward
+                ? 'text-on-surface-variant hover:text-white hover:bg-surface-container-low'
+                : 'text-on-surface-variant/30 cursor-not-allowed',
+            )}
+            aria-label="Next month"
+            title={canStepForward ? 'Next month' : 'Already on the current month'}
+          >
+            <ChevronRight size={18} />
+          </button>
           {pctDelta != null && (
             <span
               className={cn(
@@ -234,12 +295,23 @@ export default function MonthlyReview() {
             value={formatMoney(thisBucket?.net_minor ?? 0, currency)}
             tone={((thisBucket?.net_minor ?? 0) >= 0) ? 'primary' : 'error'}
           />
+          {/* FE#23: "Receipts" replaces the not-very-useful "Categories: N"
+              card — knowing how many receipts you processed this month is
+              concrete; category count was just a metadata size signal. */}
           <StatCard
-            label="Categories"
-            value={String(thisMonth?.items.length ?? 0)}
+            label="Receipts"
+            value={String(allReceipts?.length ?? 0)}
             tone="muted"
           />
         </div>
+
+        {/* FE#23: Notable transactions — the page no longer feels like a
+            pure metric dump. Top-3 largest spending receipts for the
+            selected month, with brand icon + payee + amount. */}
+        <NotableTransactions
+          receipts={allReceipts}
+          currency={currency}
+        />
 
         {/* Category comparison */}
         <div className="col-span-12 bg-surface-container-low rounded-xl p-8 border border-outline-variant/5">
@@ -347,6 +419,69 @@ function LegendDot({ color, label }: { color: string; label: string }) {
     <div className="flex items-center gap-2">
       <div className={cn('w-2.5 h-2.5 rounded-full', color)} />
       <span className="text-xs text-on-surface-variant font-medium">{label}</span>
+    </div>
+  );
+}
+
+function NotableTransactions({
+  receipts,
+  currency,
+}: {
+  receipts: Transaction[] | null;
+  currency: string;
+}) {
+  // Top-3 spending receipts only (skip income/refunds/transfers). The
+  // `Receipts` KPI in the side stats already shows the total count.
+  const top = (receipts ?? [])
+    .filter((r) => r.amount > 0 && r.transactionType === 'spending')
+    .slice(0, 3);
+
+  return (
+    <div className="col-span-12 bg-surface-container-low rounded-xl p-8 border border-outline-variant/5">
+      <h3 className="text-xl font-bold text-white mb-1 flex items-center gap-2">
+        <Receipt size={18} /> Notable this month
+      </h3>
+      <p className="text-on-surface-variant text-sm mb-6">
+        Largest spending receipts — quick gut-check on what moved the
+        needle.
+      </p>
+      {top.length === 0 ? (
+        <p className="text-on-surface-variant text-sm py-4">
+          No spending receipts in this month yet.
+        </p>
+      ) : (
+        <ol className="space-y-3">
+          {top.map((r, idx) => (
+            <li
+              key={r.id}
+              className="flex items-center gap-4 p-3 rounded-lg bg-surface-container-high/40 border border-outline-variant/10"
+            >
+              <span className="text-on-surface-variant font-bold w-6 text-center">
+                {idx + 1}
+              </span>
+              <MerchantIcon
+                brandId={r.merchantBrandId}
+                category={r.category}
+                transactionType={r.transactionType}
+                size={40}
+              />
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-white truncate">
+                  {r.description}
+                </p>
+                {r.placeCity && (
+                  <p className="text-xs text-on-surface-variant truncate">
+                    {r.placeCity}
+                  </p>
+                )}
+              </div>
+              <span className="text-base font-bold font-headline text-white tnum">
+                {formatMoney(Math.round(r.amount * 100), currency)}
+              </span>
+            </li>
+          ))}
+        </ol>
+      )}
     </div>
   );
 }
