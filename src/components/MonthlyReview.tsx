@@ -116,10 +116,12 @@ export default function MonthlyReview() {
       fetchTransactions({
         from: startOfMonth(now),
         to: endOfMonth(now),
-        sort: 'amount',
+        // Backend only supports sort=occurred_on / sort=created_at —
+        // sort=amount needs a JOIN over postings and isn't wired yet.
+        // Pull the full month and sort by amount client-side; 200-cap
+        // covers all but the most active months.
+        sort: 'occurred_on',
         order: 'desc',
-        // Pull a full page so the same call seeds Notable (top-3) and
-        // the Receipts count. 200 covers all but the most active months.
         limit: 200,
       }),
     ])
@@ -128,7 +130,10 @@ export default function MonthlyReview() {
         setTrends(tr);
         setThisMonth(thisM);
         setLastMonth(lastM);
-        setAllReceipts(top);
+        // Client-side sort by amount desc so Notable picks largest;
+        // KPI count is independent of sort order.
+        const byAmount = [...top].sort((a, b) => b.amount - a.amount);
+        setAllReceipts(byAmount);
       })
       .catch((e) => setError(extractProblemMessage(e)))
       .finally(() => setLoading(false));
@@ -432,8 +437,13 @@ function NotableTransactions({
 }) {
   // Top-3 spending receipts only (skip income/refunds/transfers). The
   // `Receipts` KPI in the side stats already shows the total count.
+  // `mapTransaction` stores spending as NEGATIVE amount (see api.ts
+  // mapTransaction: amount = transactionType==='income' ? rv.total : -rv.total),
+  // so filter+sort by |amount| descending.
   const top = (receipts ?? [])
-    .filter((r) => r.amount > 0 && r.transactionType === 'spending')
+    .filter((r) => r.transactionType === 'spending' && r.amount !== 0)
+    .map((r) => ({ ...r, _abs: Math.abs(r.amount) }))
+    .sort((a, b) => b._abs - a._abs)
     .slice(0, 3);
 
   return (
@@ -476,7 +486,7 @@ function NotableTransactions({
                 )}
               </div>
               <span className="text-base font-bold font-headline text-white tnum">
-                {formatMoney(Math.round(r.amount * 100), currency)}
+                {formatMoney(Math.round(r._abs * 100), currency)}
               </span>
             </li>
           ))}
