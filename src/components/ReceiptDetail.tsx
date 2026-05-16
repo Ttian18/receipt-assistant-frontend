@@ -436,7 +436,7 @@ function SimpleBackBar({ onBack }: { onBack: () => void }) {
         className="flex items-center gap-2 hover:text-[var(--color-ink)] transition-colors"
       >
         <span className="font-display italic text-lg leading-none text-[var(--color-terracotta)]">←</span>
-        Ledger
+        Back
       </button>
     </div>
   );
@@ -489,7 +489,7 @@ function TopBar({
         className="flex items-center gap-2 hover:text-[var(--color-ink)] transition-colors"
       >
         <span className="font-display italic text-lg leading-none text-[var(--color-terracotta)]">←</span>
-        Ledger
+        Back
       </button>
       <div className="flex items-center gap-3">
         {isTombstoned && <DeletedBadge deletedAt={deletedAt} />}
